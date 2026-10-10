@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Report an Incident — Crimvexa Witness</title>
+  <meta name="description" content="Submit a crime complaint draft using the Crimvexa Witness prototype form." />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .complaint-layout {
+      max-width: 760px; margin: 40px auto; padding: 0 24px 80px;
+    }
+    .form-section-title {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--teal-400);
+      margin: 28px 0 14px; display: flex; align-items: center; gap: 8px;
+    }
+    .form-section-title::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .char-count { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 4px; }
+  </style>
+</head>
+<body class="page">
+
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__brand">
+        <div class="nav__brand-icon">🔍</div>
+        Crimvexa Witness
+      </a>
+      <div class="nav__links">
+        <a href="index.html"      class="nav__link"><span>Home</span></a>
+        <a href="complaint.html"  class="nav__link nav__link--active"><span>Report</span></a>
+        <a href="dashboard.html"  class="nav__link"><span>Dashboard</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="complaint-layout" id="main">
+
+    <!-- Breadcrumb -->
+    <div class="breadcrumb" aria-label="Breadcrumb">
+      <a href="index.html">Home</a>
+      <span>›</span>
+      <span>Report an Incident</span>
+    </div>
+
+    <!-- Step indicator -->
+    <div class="steps" role="list" aria-label="Progress steps">
+      <div class="step step--active" role="listitem">
+        <div class="step__dot">1</div>
+        <div class="step__label">Describe</div>
+      </div>
+      <div class="step" role="listitem">
+        <div class="step__dot">2</div>
+        <div class="step__label">Review</div>
+      </div>
+      <div class="step" role="listitem">
+        <div class="step__dot">3</div>
+        <div class="step__label">Confirm</div>
+      </div>
+    </div>
+
+    <!-- Prototype notice -->
+    <div class="alert alert--warning mb-16">
+      <span class="alert__icon">⚠️</span>
+      <span>This form creates a <strong>demonstration draft only</strong>. It is not an official complaint and will not be sent to any police authority or government agency.</span>
+    </div>
+
+    <!-- API error banner -->
+    <div id="api-error" class="alert alert--error mb-16 hidden" role="alert" aria-live="polite">
+      <span class="alert__icon">❌</span>
+      <span id="api-error-msg"></span>
+    </div>
+
+    <!-- Form -->
+    <div class="card card--glow">
+      <div class="card__header">
+        <div>
+          <div class="card__title">📝 Incident Report Form</div>
+          <div class="card__subtitle">Fill in as much detail as you can. Fields marked * are required.</div>
+        </div>
+      </div>
+
+      <form id="complaint-form" novalidate>
+
+        <!-- Description -->
+        <div class="form-section-title">What Happened</div>
+        <div class="form-group">
+          <label class="form-label" for="description">
+            Incident Description <span class="required">*</span>
+          </label>
+          <div class="voice-wrap">
+            <textarea
+              id="description" name="description"
+              class="form-textarea" rows="5"
+              placeholder="Describe what happened in your own words. Include what you saw, who was involved, and any other details you remember."
+              maxlength="2000"
+              aria-required="true"
+              aria-describedby="desc-hint desc-error"
+            ></textarea>
+            <button type="button" class="voice-btn" id="voice-btn" title="Click to dictate (voice input)" aria-label="Start voice input">🎤</button>
+          </div>
+          <div id="voice-status" class="voice-status" aria-live="polite"></div>
+          <div class="char-count"><span id="desc-count">0</span> / 2000</div>
+          <div class="form-hint" id="desc-hint">Be as specific as possible — more detail helps the analysis.</div>
+          <div class="form-error hidden" id="desc-error" role="alert">⚠ Please describe what happened.</div>
+        </div>
+
+        <!-- Location & Time -->
+        <div class="form-section-title">Where & When</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="location">
+              Incident Location <span class="optional">(recommended)</span>
+            </label>
+            <input
+              type="text" id="location" name="location"
+              class="form-input"
+              placeholder="e.g. Central Bus Stand, Chennai"
+              aria-describedby="location-hint"
+            />
+            <div class="form-hint" id="location-hint">Street, landmark, or area name.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="incident_time">
+              Date &amp; Time <span class="optional">(if known)</span>
+            </label>
+            <input
+              type="datetime-local" id="incident_time" name="incident_time"
+              class="form-input"
+            />
+          </div>
+        </div>
+
+        <!-- Optional details -->
+        <div class="form-section-title">Additional Details <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);margin-left:6px;">— optional but helpful</span></div>
+
+        <div class="form-group">
+          <label class="form-label" for="item_details">Items / Property Involved</label>
+          <input
+            type="text" id="item_details" name="item_details"
+            class="form-input"
+            placeholder="e.g. Black iPhone 13, worth approx. ₹60,000"
+          />
+        </div>
+
+        <div class="form-group mt-12">
+          <label class="form-label" for="escape_direction">Suspect Description / Direction of Escape</label>
+          <input
+            type="text" id="escape_direction" name="escape_direction"
+            class="form-input"
+            placeholder="e.g. Male, ~25 years, left towards Anna Salai on a red motorcycle"
+          />
+        </div>
+
+        <div class="form-group mt-12">
+          <label class="form-label" for="preferred_language">Preferred Language</label>
+          <select id="preferred_language" name="preferred_language" class="form-select">
+            <option value="en">English</option>
+            <option value="ta">Tamil</option>
+            <option value="hi">Hindi</option>
+          </select>
+        </div>
+
+        <!-- Evidence -->
+        <div class="form-section-title">Digital Evidence <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);margin-left:6px;">— images, videos, audio, documents</span></div>
+        <div class="form-group">
+          <label class="form-label" for="evidence_files">Upload Files (Mock UI)</label>
+          <input
+            type="file" id="evidence_files" name="evidence_files"
+            class="form-input" multiple
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+            style="padding: 10px;"
+          />
+          <div class="form-hint">Supported formats: JPG, PNG, MP4, MP3, PDF, DOC. Files are not actually uploaded in this demo.</div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex gap-12 mt-24" style="justify-content:flex-end; flex-wrap:wrap;">
+          <a href="index.html" class="btn btn--secondary">Cancel</a>
+          <button type="submit" class="btn btn--primary btn--lg" id="submit-btn">
+            <span id="submit-label">Submit Draft</span>
+            <div class="btn-spinner hidden" id="submit-spinner" aria-hidden="true"></div>
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+  </main>
+
+  <footer class="disclaimer-bar">
+    ⚠️ Hackathon prototype only. Not an official crime reporting system. For emergencies, call <strong>112</strong>.
+  </footer>
+
+  <script type="module">
+    import { api } from './api.js';
+
+    const form       = document.getElementById('complaint-form');
+    const submitBtn  = document.getElementById('submit-btn');
+    const submitLbl  = document.getElementById('submit-label');
+    const spinner    = document.getElementById('submit-spinner');
+    const apiErr     = document.getElementById('api-error');
+    const apiErrMsg  = document.getElementById('api-error-msg');
+    const descEl     = document.getElementById('description');
+    const descCount  = document.getElementById('desc-count');
+    const descErr    = document.getElementById('desc-error');
+    const voiceBtn   = document.getElementById('voice-btn');
+    const voiceSt    = document.getElementById('voice-status');
+
+    // ── Character counter ──────────────────────────────────
+    descEl.addEventListener('input', () => {
+      descCount.textContent = descEl.value.length;
+    });
+
+    // ── Voice input ────────────────────────────────────────
+    let recognition = null;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.continuous  = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-IN';
+
+      recognition.onstart = () => {
+        voiceBtn.classList.add('listening');
+        voiceBtn.textContent = '⏹';
+        voiceSt.textContent = '🎙 Listening… speak now';
+        voiceSt.classList.add('visible');
+      };
+      recognition.onresult = (e) => {
+        let transcript = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          transcript += e.results[i][0].transcript;
+        }
+        descEl.value = transcript;
+        descCount.textContent = descEl.value.length;
+      };
+      recognition.onend = () => {
+        voiceBtn.classList.remove('listening');
+        voiceBtn.textContent = '🎤';
+        voiceSt.classList.remove('visible');
+      };
+      recognition.onerror = (e) => {
+        voiceBtn.classList.remove('listening');
+        voiceBtn.textContent = '🎤';
+        voiceSt.textContent = e.error === 'not-allowed'
+          ? 'Microphone access denied. Please type instead.'
+          : 'Voice recognition error. Please type instead.';
+        voiceSt.classList.add('visible');
+        setTimeout(() => voiceSt.classList.remove('visible'), 4000);
+      };
+
+      let isListening = false;
+      voiceBtn.addEventListener('click', () => {
+        if (isListening) { recognition.stop(); isListening = false; }
+        else             { recognition.start(); isListening = true; }
+      });
+    } else {
+      voiceBtn.title = 'Voice input not supported in this browser. Please type instead.';
+      voiceBtn.style.opacity = '0.4';
+      voiceBtn.style.cursor  = 'not-allowed';
+    }
+
+    // ── Validate ───────────────────────────────────────────
+    function validate() {
+      let ok = true;
+      if (!descEl.value.trim()) {
+        descEl.classList.add('form-input--error');
+        descErr.classList.remove('hidden');
+        ok = false;
+      } else {
+        descEl.classList.remove('form-input--error');
+        descErr.classList.add('hidden');
+      }
+      return ok;
+    }
+
+    descEl.addEventListener('input', () => {
+      if (descEl.value.trim()) {
+        descEl.classList.remove('form-input--error');
+        descErr.classList.add('hidden');
+      }
+    });
+
+    // ── Format datetime-local → "YYYY-MM-DD HH:MM" ────────
+    function fmtTime(val) {
+      if (!val) return '';
+      return val.replace('T', ' ');
+    }
+
+    // ── Submit ─────────────────────────────────────────────
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!validate()) return;
+
+      apiErr.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitLbl.textContent = 'Submitting…';
+      spinner.classList.remove('hidden');
+
+      const payload = {
+        description:        descEl.value.trim(),
+        location:           document.getElementById('location').value.trim() || undefined,
+        incident_time:      fmtTime(document.getElementById('incident_time').value) || undefined,
+        item_details:       document.getElementById('item_details').value.trim() || undefined,
+        escape_direction:   document.getElementById('escape_direction').value.trim() || undefined,
+        preferred_language: document.getElementById('preferred_language').value,
+      };
+      // Remove undefined keys
+      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+
+      try {
+        const data = await api.submitComplaint(payload);
+        // Store result in sessionStorage and redirect
+        sessionStorage.setItem('cw_complaint_id', data.complaint_id);
+        sessionStorage.setItem('cw_submit_result', JSON.stringify(data));
+        window.location.href = `confirm.html?id=${data.complaint_id}`;
+      } catch (err) {
+        apiErrMsg.textContent = err.message;
+        apiErr.classList.remove('hidden');
+        apiErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } finally {
+        submitBtn.disabled = false;
+        submitLbl.textContent = 'Submit Draft';
+        spinner.classList.add('hidden');
+      }
+    });
+  </script>
+
+</body>
+</html>

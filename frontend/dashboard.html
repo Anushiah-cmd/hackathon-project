@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Officer Dashboard — Crimvexa Witness</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .dash-layout { max-width: 1100px; margin: 40px auto; padding: 0 24px 80px; }
+    .dash-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-card); }
+    .stat-card__title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .stat-card__val { font-size: 32px; font-weight: 800; color: var(--text-100); line-height: 1; }
+    .stat-card__sub { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  </style>
+</head>
+<body class="page">
+
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__brand">
+        <div class="nav__brand-icon">🔍</div>
+        Crimvexa Witness
+      </a>
+      <div class="nav__links">
+        <a href="index.html"     class="nav__link"><span>Home</span></a>
+        <a href="complaint.html" class="nav__link"><span>Report</span></a>
+        <a href="dashboard.html" class="nav__link nav__link--active"><span>Dashboard</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="dash-layout">
+    
+    <div class="alert alert--warning mb-24">
+      <span class="alert__icon">⚠️</span>
+      <span><strong>Prototype Dashboard:</strong> This interface displays local demonstration data only. It is not connected to any real police database.</span>
+    </div>
+
+    <div class="dash-header">
+      <div>
+        <h1 style="font-size:24px;font-weight:700;color:var(--text-100);">Officer Dashboard</h1>
+        <p style="color:var(--text-muted);font-size:14px;margin-top:4px;">Manage and review submitted prototype complaints.</p>
+      </div>
+      <button class="btn btn--secondary" id="refresh-btn">
+        <span id="refresh-icon">🔄</span> Refresh Data
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-cards" id="stats-container" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-card__title">Total Drafts</div>
+        <div class="stat-card__val" id="stat-total">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__title">New</div>
+        <div class="stat-card__val" id="stat-new" style="color:var(--blue-400);">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__title">High Priority</div>
+        <div class="stat-card__val" id="stat-high" style="color:var(--red-400);">-</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar card mb-16" style="padding:16px;">
+      <input type="text" id="search-input" class="form-input" placeholder="Search by ID or keywords..." />
+      <select id="filter-status" class="form-select">
+        <option value="">All Statuses</option>
+        <option value="New">New</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Resolved">Resolved</option>
+      </select>
+      <select id="filter-priority" class="form-select">
+        <option value="">All Priorities</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
+      </select>
+    </div>
+
+    <!-- Table Area -->
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div id="loading-state" class="loading-state">
+        <div class="spinner"></div><span>Loading complaints…</span>
+      </div>
+      
+      <div id="error-state" class="hidden" style="padding:40px 24px; text-align:center;">
+        <div class="alert alert--error" style="display:inline-flex;">
+          <span class="alert__icon">❌</span>
+          <span id="error-msg"></span>
+        </div>
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-state__icon">📭</div>
+        <div class="empty-state__title">No Complaints Found</div>
+        <div class="empty-state__desc">There are no demonstration drafts matching your criteria.</div>
+      </div>
+
+      <div class="table-wrap hidden" id="table-wrap">
+        <table id="complaints-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Description Snippet</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module">
+    import { api } from './api.js';
+
+    const loadEl   = document.getElementById('loading-state');
+    const errEl    = document.getElementById('error-state');
+    const errMsg   = document.getElementById('error-msg');
+    const emptyEl  = document.getElementById('empty-state');
+    const tableWrap= document.getElementById('table-wrap');
+    const tbody    = document.getElementById('table-body');
+    const statsCon = document.getElementById('stats-container');
+    
+    let allData = [];
+
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    function priorityBadge(p) {
+      if (!p) return `<span class="badge badge--medium">—</span>`;
+      const c = { 'High':'badge--high', 'Medium':'badge--medium', 'Low':'badge--low' }[p] || 'badge--medium';
+      return `<span class="badge ${c}">${p}</span>`;
+    }
+    
+    function statusBadge(s) {
+      if (!s) return `<span class="badge badge--new">New</span>`;
+      const c = { 'New':'badge--new', 'Under Review':'badge--review', 'Resolved':'badge--resolved' }[s] || 'badge--new';
+      return `<span class="badge ${c}">${s}</span>`;
+    }
+
+    function renderTable(data) {
+      tbody.innerHTML = '';
+      if (data.length === 0) {
+        hide(tableWrap); show(emptyEl); return;
+      }
+      hide(emptyEl); show(tableWrap);
+
+      data.forEach(c => {
+        const tr = document.createElement('tr');
+        const desc = c.description ? c.description.substring(0, 50) + '...' : '—';
+        tr.innerHTML = `
+          <td>${c.complaint_id}</td>
+          <td><div style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.description}">${desc}</div></td>
+          <td><span class="badge badge--cat">${c.category || '—'}</span></td>
+          <td>${priorityBadge(c.priority)}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td><a href="detail.html?id=${c.complaint_id}" class="btn btn--sm btn--secondary">View</a></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateStats(data) {
+      statsCon.style.display = 'grid';
+      document.getElementById('stat-total').textContent = data.length;
+      document.getElementById('stat-new').textContent = data.filter(c => c.status === 'New').length;
+      document.getElementById('stat-high').textContent = data.filter(c => c.priority === 'High').length;
+    }
+
+    function applyFilters() {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      const s = document.getElementById('filter-status').value;
+      const p = document.getElementById('filter-priority').value;
+
+      const filtered = allData.filter(c => {
+        const matchQ = !q || c.complaint_id.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q);
+        const matchS = !s || c.status === s;
+        const matchP = !p || c.priority === p;
+        return matchQ && matchS && matchP;
+      });
+      renderTable(filtered);
+    }
+
+    async function loadData() {
+      hide(errEl); hide(emptyEl); hide(tableWrap); show(loadEl); statsCon.style.display = 'none';
+      try {
+        const res = await api.listComplaints();
+        allData = res.complaints || [];
+        updateStats(allData);
+        applyFilters();
+      } catch (err) {
+        errMsg.textContent = err.message;
+        show(errEl);
+      } finally {
+        hide(loadEl);
+      }
+    }
+
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    document.getElementById('filter-status').addEventListener('change', applyFilters);
+    document.getElementById('filter-priority').addEventListener('change', applyFilters);
+    
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+      const icon = document.getElementById('refresh-icon');
+      icon.style.display = 'inline-block';
+      icon.style.animation = 'spin 0.5s linear';
+      setTimeout(() => icon.style.animation = '', 500);
+      loadData();
+    });
+
+    loadData();
+  </script>
+
+</body>
+</html>

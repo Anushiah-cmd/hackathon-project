@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crimvexa Witness — Crime Complaint Assistance Prototype</title>
+  <meta name="description" content="Crimvexa Witness: a voice-first and text-based crime complaint assistance prototype for hackathon demonstration." />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* ── Home-page specific ─────────────────────── */
+    .hero {
+      min-height: calc(100vh - 60px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 60px 24px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(20,184,166,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero__eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--teal-400);
+      border: 1px solid var(--border-2); border-radius: 99px;
+      padding: 5px 16px; margin-bottom: 24px; display: inline-block;
+    }
+    .hero__logo {
+      width: 72px; height: 72px;
+      background: linear-gradient(135deg, var(--teal-500), var(--blue-500));
+      border-radius: 20px; margin: 0 auto 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; box-shadow: 0 8px 32px rgba(20,184,166,0.35);
+    }
+    .hero__title {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 800; color: var(--text-100);
+      line-height: 1.1; margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 40%, var(--teal-400));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero__sub {
+      font-size: clamp(15px, 2vw, 18px);
+      color: var(--text-300); max-width: 560px;
+      margin: 0 auto 36px; line-height: 1.7;
+    }
+    .hero__cta { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    .hero__cta .btn--lg { min-width: 200px; }
+
+    .how-section { padding: 80px 24px; }
+    .how-section h2 { text-align: center; font-size: 28px; font-weight: 700; color: var(--text-100); margin-bottom: 48px; }
+    .steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto; }
+    .how-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px;
+      text-align: center; transition: border-color var(--transition), transform var(--transition);
+    }
+    .how-card:hover { border-color: var(--border-2); transform: translateY(-3px); }
+    .how-card__num {
+      width: 42px; height: 42px; background: var(--teal-glow);
+      border: 1px solid var(--border-2); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: var(--teal-400);
+      margin: 0 auto 14px;
+    }
+    .how-card h3 { font-size: 15px; font-weight: 600; color: var(--text-100); margin-bottom: 8px; }
+    .how-card p  { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+    .notice-section {
+      background: var(--bg-800); border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border); padding: 20px 24px;
+    }
+    .notice-inner {
+      max-width: 800px; margin: 0 auto;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+  </style>
+</head>
+<body class="page">
+
+  <!-- Nav -->
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__brand">
+        <div class="nav__brand-icon">🔍</div>
+        Crimvexa Witness
+      </a>
+      <div class="nav__links">
+        <a href="index.html" class="nav__link nav__link--active"><span>Home</span></a>
+        <a href="complaint.html" class="nav__link"><span>Report</span></a>
+        <a href="dashboard.html" class="nav__link"><span>Dashboard</span></a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero__eyebrow">Hackathon Prototype · Demonstration Only</div>
+      <div class="hero__logo" aria-hidden="true">🔍</div>
+      <h1 class="hero__title" id="hero-title">CRIMVEXA AI</h1>
+      <p class="hero__sub">
+        Smart Crime Reporting with AI and Digital Evidence Analysis.
+        Describe what happened, upload evidence securely, and let our AI engine predict categories, assess priorities, and assist investigations.
+      </p>
+      <div class="hero__cta">
+        <a href="complaint.html" class="btn btn--primary btn--lg" id="report-btn">
+          📝 Report an Incident
+        </a>
+        <a href="dashboard.html" class="btn btn--secondary btn--lg" id="dashboard-btn">
+          🗂️ Officer Dashboard
+        </a>
+      </div>
+    </section>
+
+    <!-- Notice -->
+    <section class="notice-section" aria-label="Disclaimer notices">
+      <div class="notice-inner">
+        <div class="alert alert--warning">
+          <span class="alert__icon">⚠️</span>
+          <span><strong>Hackathon prototype only.</strong> Submissions are stored locally and are NOT sent to any real police authority, government agency, or emergency service. Do not use this for real emergencies — call 112.</span>
+        </div>
+        <div class="alert alert--info">
+          <span class="alert__icon">🔒</span>
+          <span><strong>Privacy notice:</strong> Do not enter real sensitive personal information in this demo. This prototype is not affiliated with any police department or government body.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="how-section" aria-labelledby="how-title">
+      <div class="container">
+        <h2 id="how-title">How It Works</h2>
+        <div class="steps-grid">
+          <div class="how-card">
+            <div class="how-card__num">1</div>
+            <h3>Describe the Incident</h3>
+            <p>Type or dictate what happened — location, time, and what was involved.</p>
+          </div>
+          <div class="how-card">
+            <div class="how-card__num">2</div>
+            <h3>Upload Evidence</h3>
+            <p>Securely attach digital evidence like images, videos, audio, or documents.</p>
+          </div>
+          <div class="how-card">
+            <div class="how-card__num">3</div>
+            <h3>AI Analysis Engine</h3>
+            <p>NLP extracts details, predicts crime category & priority, and finds similar cases.</p>
+          </div>
+          <div class="how-card">
+            <div class="how-card__num">4</div>
+            <h3>Police & Cyber Modules</h3>
+            <p>Specialised dashboards for police, cyber crime officers, and forensic experts.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer disclaimer -->
+  <footer class="disclaimer-bar" role="contentinfo">
+    ⚠️ Crimvexa Witness is a 24-hour hackathon prototype. All data is fictional. This is NOT an official crime reporting system.
+  </footer>
+
+</body>
+</html>
