@@ -1,0 +1,608 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Dashboard | CRIMVEXA AI</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        .topbar {
+            background: #0f172a;
+            color: white;
+            padding: 18px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .brand {
+            color: white;
+            font-size: 23px;
+            font-weight: bold;
+        }
+
+        .topbar nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .topbar nav a {
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+
+        .topbar nav a:hover {
+            color: #60a5fa;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            margin: auto;
+            padding: 35px 20px;
+        }
+
+        .welcome {
+            background: linear-gradient(120deg, #172554, #1d4ed8);
+            color: white;
+            padding: 32px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+        }
+
+        .welcome h1 {
+            font-size: 30px;
+            margin-bottom: 12px;
+        }
+
+        .welcome p {
+            line-height: 1.7;
+            color: #dbeafe;
+        }
+
+        .primary-button {
+            display: inline-block;
+            background: #ffffff;
+            color: #1d4ed8;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 18px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .primary-button:hover {
+            background: #dbeafe;
+        }
+
+        .section-title {
+            font-size: 22px;
+            margin: 30px 0 18px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 23px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+        }
+
+        .stat-card .number {
+            font-size: 29px;
+            font-weight: bold;
+            color: #1d4ed8;
+            margin-bottom: 8px;
+        }
+
+        .stat-card p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 22px;
+            margin-top: 28px;
+        }
+
+        .panel {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            min-width: 0;
+        }
+
+        .panel h2 {
+            font-size: 20px;
+            margin-bottom: 18px;
+        }
+
+        .report-form label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            margin: 15px 0 7px;
+        }
+
+        .report-form input,
+        .report-form select,
+        .report-form textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .report-form textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .submit-button {
+            width: 100%;
+            padding: 13px;
+            margin-top: 18px;
+            background: #1d4ed8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .submit-button:hover {
+            background: #1e40af;
+        }
+
+        .notice {
+            margin-top: 14px;
+            color: #b45309;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .quick-link {
+            display: block;
+            border: 1px solid #e2e8f0;
+            border-radius: 9px;
+            padding: 15px;
+            margin-bottom: 12px;
+            color: #1e293b;
+            transition: 0.2s;
+        }
+
+        .quick-link:hover {
+            border-color: #60a5fa;
+            background: #eff6ff;
+        }
+
+        .quick-link strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #1d4ed8;
+        }
+
+        .quick-link span {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .complaints-panel {
+            margin-top: 25px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 480px;
+        }
+
+        th, td {
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #475569;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 12px;
+        }
+
+        .empty-message {
+            padding: 20px 0;
+            color: #64748b;
+            line-height: 1.6;
+        }
+
+        .safety-box {
+            margin-top: 25px;
+            padding: 22px;
+            border-radius: 12px;
+            background: #e0f2fe;
+            border: 1px solid #bae6fd;
+            line-height: 1.7;
+        }
+
+        .safety-box h2 {
+            margin-bottom: 8px;
+            color: #075985;
+        }
+
+        footer {
+            text-align: center;
+            padding: 25px;
+            background: #0f172a;
+            color: #cbd5e1;
+            margin-top: 35px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        footer a {
+            color: #93c5fd;
+            margin: 0 8px;
+        }
+
+        @media (max-width: 800px) {
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .welcome h1 {
+                font-size: 25px;
+            }
+
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <header class="topbar">
+        <a class="brand" href="index.html">CRIMVEXA AI</a>
+
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="#report">Report a Crime</a>
+            <a href="#complaints">My Complaints</a>
+            <a href="login.html">Login</a>
+            <a href="register.html">Register</a>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+
+        <!-- Welcome Section -->
+        <section class="welcome">
+            <h1>Citizen Dashboard</h1>
+
+            <p>
+                Welcome to CRIMVEXA AI — an AI-assisted crime reporting
+                platform designed to help citizens submit reports,
+                monitor complaint progress, and access safety information.
+            </p>
+
+            <a href="#report" class="primary-button">
+                + Report a Crime
+            </a>
+        </section>
+
+        <!-- Dashboard Statistics -->
+        <h2 class="section-title">Dashboard Overview</h2>
+
+        <section class="stats">
+            <article class="stat-card">
+                <div class="number" id="totalReports">0</div>
+                <p>My Reports (Demo)</p>
+            </article>
+
+            <article class="stat-card">
+                <div class="number" id="pendingReports">0</div>
+                <p>Pending Reports (Demo)</p>
+            </article>
+
+            <article class="stat-card">
+                <div class="number" id="reviewedReports">0</div>
+                <p>Reports Reviewed (Demo)</p>
+            </article>
+        </section>
+
+        <section class="main-grid">
+
+            <!-- Crime Report Form -->
+            <article class="panel" id="report">
+                <h2>Submit a Crime Report</h2>
+
+                <form class="report-form" id="crimeReportForm">
+
+                    <label for="crimeType">Type of Incident</label>
+                    <select id="crimeType" name="crimeType" required>
+                        <option value="">Select incident type</option>
+                        <option value="Theft">Theft</option>
+                        <option value="Cybercrime">Cybercrime</option>
+                        <option value="Fraud">Fraud</option>
+                        <option value="Harassment">Harassment</option>
+                        <option value="Missing Person">Missing Person</option>
+                        <option value="Public Safety">Public Safety Concern</option>
+                        <option value="Other">Other</option>
+                    </select>
+
+                    <label for="incidentDate">Date of Incident</label>
+                    <input
+                        type="date"
+                        id="incidentDate"
+                        name="incidentDate"
+                        required
+                    >
+
+                    <label for="incidentLocation">Incident Location</label>
+                    <input
+                        type="text"
+                        id="incidentLocation"
+                        name="incidentLocation"
+                        placeholder="Enter the incident location"
+                        required
+                    >
+
+                    <label for="description">Incident Description</label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        placeholder="Describe what happened..."
+                        required
+                    ></textarea>
+
+                    <label for="evidence">Evidence File (Optional)</label>
+                    <input
+                        type="file"
+                        id="evidence"
+                        name="evidence"
+                        accept="image/*,.pdf,.txt"
+                    >
+
+                    <p class="notice">
+                        Demo only: do not upload real victim information or
+                        sensitive evidence. Files are not uploaded to a server.
+                    </p>
+
+                    <button type="submit" class="submit-button">
+                        Submit Demo Report
+                    </button>
+
+                    <p id="reportMessage" class="notice"
+                       role="status" aria-live="polite"></p>
+
+                </form>
+            </article>
+
+            <!-- Quick Actions -->
+            <aside class="panel">
+                <h2>Quick Actions</h2>
+
+                <a href="#report" class="quick-link">
+                    <strong>+ New Crime Report</strong>
+                    <span>Fill out the incident reporting form.</span>
+                </a>
+
+                <a href="#complaints" class="quick-link">
+                    <strong>Track My Complaints</strong>
+                    <span>View demo reports and their current status.</span>
+                </a>
+
+                <a href="index.html#how-it-works" class="quick-link">
+                    <strong>How It Works</strong>
+                    <span>Learn about the CRIMVEXA AI reporting process.</span>
+                </a>
+
+                <a href="index.html#about" class="quick-link">
+                    <strong>About CRIMVEXA AI</strong>
+                    <span>Learn about the project and its features.</span>
+                </a>
+
+                <a href="login.html" class="quick-link">
+                    <strong>Login Page</strong>
+                    <span>Open the login page.</span>
+                </a>
+
+                <a href="register.html" class="quick-link">
+                    <strong>Create an Account</strong>
+                    <span>Open the registration page.</span>
+                </a>
+            </aside>
+
+        </section>
+
+        <!-- Complaint Tracking -->
+        <section class="panel complaints-panel" id="complaints">
+            <h2>My Complaints</h2>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Report ID</th>
+                            <th>Incident Type</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="complaintTable">
+                        <tr>
+                            <td colspan="4" class="empty-message">
+                                No demo reports submitted yet.
+                                Use the form above to add a sample report.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="notice">
+                These sample entries are stored only in this browser session.
+                They are not official police complaints.
+            </p>
+        </section>
+
+        <!-- Safety Information -->
+        <section class="safety-box">
+            <h2>Important Safety Information</h2>
+
+            <p>
+                CRIMVEXA AI is a project demonstration and is not an
+                official police reporting service. If you are in immediate
+                danger in India, call <strong>112</strong> for emergency
+                assistance. Do not delay contacting emergency services
+                to use this demo.
+            </p>
+        </section>
+
+    </main>
+
+    <footer>
+        <p>© 2026 CRIMVEXA AI | AI-Assisted Crime Reporting</p>
+
+        <p>
+            <a href="index.html">Home</a>
+            <a href="login.html">Login</a>
+            <a href="register.html">Register</a>
+        </p>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+        const form = document.getElementById("crimeReportForm");
+        const message = document.getElementById("reportMessage");
+        const table = document.getElementById("complaintTable");
+
+        function loadReports() {
+            return window.Crimvexa.loadData().cases;
+        }
+
+        function updateDashboard() {
+            const reports = loadReports();
+            document.getElementById("totalReports").textContent = reports.length;
+            document.getElementById("pendingReports").textContent = reports.filter(r => r.status === "SUBMITTED" || r.status === "UNDER_REVIEW").length;
+            document.getElementById("reviewedReports").textContent = reports.filter(r => r.status === "RESOLVED" || r.status === "CLOSED").length;
+
+            if (reports.length === 0) {
+                table.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="empty-message">
+                            No demo reports submitted yet.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            table.innerHTML = reports.map((report) => `
+                <tr>
+                    <td>${report.id}</td>
+                    <td>${report.incidentType || report.category || 'Unknown'}</td>
+                    <td>${report.incidentDate || new Date(report.createdAt).toISOString().slice(0, 10)}</td>
+                    <td><span class="status">${report.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const incidentDate = document.getElementById("incidentDate").value;
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+
+            if (incidentDate && new Date(incidentDate + "T00:00:00") > today) {
+                message.textContent = "Please select today or an earlier incident date.";
+                return;
+            }
+
+            const description = document.getElementById("description").value.trim();
+            const incidentType = document.getElementById("crimeType").value;
+            const location = document.getElementById("incidentLocation").value.trim();
+            const report = {
+                id: window.Crimvexa.generateCaseId(),
+                reporterName: "Citizen Demo User",
+                email: "citizen@example.com",
+                incidentType,
+                incidentDate,
+                location,
+                description,
+                category: window.Crimvexa.inferCategory(description),
+                status: "SUBMITTED",
+                analysis: window.Crimvexa.buildAnalysis(description, location, incidentType).priority,
+                caseLinks: window.Crimvexa.buildAnalysis(description, location, incidentType).caseLinks,
+                createdAt: new Date().toISOString(),
+                statusHistory: [{ status: "SUBMITTED", timestamp: new Date().toISOString(), actor: "Citizen", note: "Complaint submitted." }]
+            };
+
+            window.Crimvexa.addCase(report);
+            updateDashboard();
+            message.textContent = "Demo report added to this page. It has NOT been sent to the police.";
+            form.reset();
+        });
+
+        updateDashboard();
+    </script>
+
+</body>
+</html>

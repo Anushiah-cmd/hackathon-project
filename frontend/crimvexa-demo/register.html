@@ -1,0 +1,243 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | CRIMVEXA AI</title>
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .register-container {
+            min-height: 85vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
+            background: #f4f7fb;
+        }
+
+        .register-card {
+            width: 100%;
+            max-width: 480px;
+            background: white;
+            padding: 35px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.10);
+        }
+
+        .register-card h1 {
+            text-align: center;
+            color: #172554;
+            margin-bottom: 10px;
+        }
+
+        .register-description {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 25px;
+        }
+
+        .register-form label {
+            display: block;
+            margin: 15px 0 7px;
+            color: #334155;
+            font-weight: 600;
+        }
+
+        .register-form input,
+        .register-form select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+        }
+
+        .register-form input:focus,
+        .register-form select:focus {
+            outline: 2px solid #93c5fd;
+            border-color: #2563eb;
+        }
+
+        .register-button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #1d4ed8;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .register-button:hover {
+            background: #1e40af;
+        }
+
+        .register-links {
+            text-align: center;
+            margin-top: 20px;
+            line-height: 2;
+        }
+
+        .register-links a {
+            color: #1d4ed8;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .register-links a:hover {
+            text-decoration: underline;
+        }
+
+        .register-message {
+            margin-top: 15px;
+            text-align: center;
+            color: #b45309;
+            font-size: 14px;
+        }
+
+        .register-footer {
+            text-align: center;
+            padding: 18px;
+            color: #64748b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <nav>
+            <a href="index.html" class="logo">CRIMVEXA AI</a>
+
+            <div>
+                <a href="index.html">Home</a>
+                <a href="complaint.html">Report a crime</a>
+                <a href="citizen-dashboard.html">Dashboard</a>
+                <a href="login.html">Login</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Registration Form -->
+    <main class="register-container">
+        <section class="register-card">
+            <h1>Create Account</h1>
+
+            <p class="register-description">
+                Join CRIMVEXA AI to access the crime reporting platform.
+            </p>
+
+            <form class="register-form" id="registerForm">
+
+                <label for="fullName">Full Name</label>
+                <input
+                    type="text"
+                    id="fullName"
+                    name="fullName"
+                    placeholder="Enter your full name"
+                    autocomplete="name"
+                    required
+                >
+
+                <label for="email">Email Address</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    autocomplete="email"
+                    required
+                >
+
+                <label for="phone">Phone Number</label>
+                <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="Enter your phone number"
+                    autocomplete="tel"
+                    required
+                >
+
+                <label for="role">Account Type</label>
+                <select id="role" name="role" required>
+                    <option value="">Select account type</option>
+                    <option value="citizen">Citizen</option>
+                    <option value="officer">Police Officer (Demo)</option>
+                </select>
+
+                <label for="password">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Create a password"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                >
+
+                <label for="confirmPassword">Confirm Password</label>
+                <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    placeholder="Re-enter your password"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                >
+
+                <button type="submit" class="register-button">
+                    Create Account
+                </button>
+
+                <p id="registerMessage" class="register-message"
+                   role="status" aria-live="polite"></p>
+            </form>
+
+            <div class="register-links">
+                Already have an account?
+                <a href="login.html">Login here</a>
+                <br>
+                <a href="index.html">← Back to Home</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="register-footer">
+        <p>© 2026 CRIMVEXA AI | AI-Assisted Crime Reporting</p>
+    </footer>
+
+    <!-- Frontend demo validation only -->
+    <script>
+        const registerForm = document.getElementById("registerForm");
+        const registerMessage = document.getElementById("registerMessage");
+
+        registerForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const password = document.getElementById("password").value;
+            const confirmPassword =
+                document.getElementById("confirmPassword").value;
+
+            if (password !== confirmPassword) {
+                registerMessage.textContent =
+                    "Passwords do not match. Please try again.";
+                return;
+            }
+
+            registerMessage.textContent =
+                "Registration form validated. Connect the backend to create your account.";
+        });
+    </script>
+
+</body>
+</html>

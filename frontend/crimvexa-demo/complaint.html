@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b1120">
+<title>Report a Crime | CRIMVEXA AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0b1120;--navy2:#111b33;--line:#24345a;--ink:#f4f6fb;--muted:#a9b6d3;--red:#e5484d;--text:#18213a;--soft:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--navy);color:var(--ink);font:400 16px/1.65 'IBM Plex Sans',system-ui,sans-serif;min-height:100vh}
+h1,h2,h3,.brand{font-family:'Bricolage Grotesque',system-ui,sans-serif;line-height:1.15}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:3px solid var(--red);outline-offset:3px}
+
+.btn{display:inline-block;padding:11px 20px;border-radius:8px;font:600 15px 'IBM Plex Sans',sans-serif;border:1.5px solid transparent;cursor:pointer;text-align:center}
+.btn-primary{background:var(--red);color:#fff}.btn-primary:hover{background:#c93a3f}
+.btn-outline{border-color:var(--line);color:var(--ink);background:transparent}.btn-outline:hover{border-color:var(--red)}
+
+/* navbar + logo slot (images/logo.png) */
+.navbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 5%;background:rgba(11,17,32,.95);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;font-weight:800;font-size:1.2rem}
+.brand em{color:var(--red);font-style:normal}
+.logo-slot{position:relative;width:42px;height:42px;border-radius:10px;background:var(--navy2);border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;flex:none}
+.logo-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:4px;background:var(--navy2)}
+.logo-slot svg{width:24px;height:24px}
+.nav-links{display:flex;gap:22px;flex-wrap:wrap}.nav-links a{color:var(--muted);font-size:15px}.nav-links a:hover,.nav-links a.here{color:#fff}
+.nav-links a.here{border-bottom:2px solid var(--red)}
+.nav-buttons{display:flex;gap:10px}
+
+/* page */
+.wrap{max-width:980px;margin:0 auto;padding:40px 20px 20px}
+.intro{margin-bottom:26px}
+.tag{color:var(--red);font-weight:600;font-size:14px}
+.intro h1{font-size:clamp(1.9rem,4vw,2.8rem);font-weight:800;margin:6px 0 10px}
+.intro p{color:var(--muted);max-width:62ch}
+.sos{margin-top:16px;padding:12px 16px;border-left:4px solid var(--red);background:rgba(229,72,77,.12);border-radius:0 8px 8px 0;font-size:14px}
+
+.layout{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start}
+.card{background:#fff;color:var(--text);border-radius:14px;padding:28px}
+.card h2{font-size:1.35rem;margin-bottom:6px}
+.sub{color:var(--soft);font-size:14px;margin-bottom:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.full{grid-column:1/-1}
+label{display:block;font-size:13px;font-weight:600;color:#334155;margin:14px 0 6px}
+input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font:400 14px 'IBM Plex Sans',sans-serif;color:var(--text);background:#fff}
+input:focus,select:focus,textarea:focus{outline:2px solid #fbb6b8;border-color:var(--red)}
+textarea{min-height:140px;resize:vertical;line-height:1.6}
+input[type=file]{background:#f8fafc}
+.note{font-size:12px;color:var(--soft);margin-top:6px;line-height:1.5}
+
+.voice{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.voice select{width:auto;padding:9px 10px}
+.mic{background:var(--red);color:#fff;border:0}
+.mic.live{background:#111;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(229,72,77,.25)}}
+#voiceState{font-size:13px;color:var(--soft)}
+
+#preview{margin-top:10px}
+#preview img{max-width:100%;max-height:150px;border-radius:8px;border:1px solid #e2e8f0}
+.consent{display:flex;gap:10px;align-items:flex-start;margin:20px 0 6px;font-weight:400;font-size:13px;color:#475569;line-height:1.6}
+.consent input{width:auto;margin-top:4px;accent-color:var(--red)}
+.submit{width:100%;margin-top:14px;padding:14px;font-size:16px;border:0}
+
+.msg{display:none;margin-top:16px;padding:14px;border-radius:8px;font-size:14px;line-height:1.7}
+.msg.ok{display:block;background:#f0fdf4;border:1px solid #86efac;color:#166534}
+.msg.bad{display:block;background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.msg a{color:inherit;font-weight:700;text-decoration:underline}
+
+/* side checklist */
+.side h3{font-size:1.1rem;margin-bottom:10px}
+.tips{list-style:none}
+.tips li{padding:9px 0 9px 30px;position:relative;border-top:1px solid #e6eaf3;font-size:14px}
+.tips li::before{content:"";position:absolute;left:0;top:13px;width:16px;height:16px;border:2px solid #cbd5e1;border-radius:50%}
+.tips li.ok::before{background:#16a34a;border-color:#16a34a}
+.tips li small{display:block;color:var(--soft);font-size:12px}
+.links{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+.links a{display:block;padding:11px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;color:var(--text)}
+.links a:hover{border-color:var(--red);background:#fff5f5}
+
+.footer{margin-top:40px;padding:30px 5%;text-align:center;color:var(--muted);font-size:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;align-items:center}
+.footer .fl{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}.footer .fl a:hover{color:#fff}
+
+@media(max-width:860px){.layout{grid-template-columns:1fr}.nav-links{display:none}}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}.card{padding:20px}.nav-buttons .btn-outline{display:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+
+<header class="navbar">
+  <a href="index.html" class="brand" aria-label="CRIMVEXA AI home">
+    <span class="logo-slot" id="logoSlot" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#e5484d" stroke-width="2" aria-hidden="true"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+    </span>
+    <span>CRIMVEXA <em>AI</em></span>
+  </a>
+  <nav class="nav-links" aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="citizen-dashboard.html">Dashboard</a>
+    <a href="complaint.html" class="here" aria-current="page">Report a crime</a>
+  </nav>
+  <div class="nav-buttons">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="intro">
+    <span class="tag">Report a crime</span>
+    <h1>Tell us what happened</h1>
+    <p>Type your statement, or press Speak and say it in your own language. The checklist on the right shows which details are still missing.</p>
+    <p class="sos"><strong>In danger right now?</strong> Call <strong>112</strong> first. This page is a project demo, not an official police service.</p>
+  </section>
+
+  <div class="layout">
+
+    <section class="card">
+      <h2>Incident details</h2>
+      <p class="sub">Fields marked * are required.</p>
+
+      <form id="complaintForm" novalidate>
+        <div class="grid2">
+          <div>
+            <label for="name">Your name *</label>
+            <input id="name" autocomplete="name" required>
+          </div>
+          <div>
+            <label for="email">Email or phone *</label>
+            <input id="email" autocomplete="username" required>
+          </div>
+          <div>
+            <label for="category">Incident category *</label>
+            <select id="category" required>
+              <option value="">Select a category</option>
+              <option>Theft</option><option>Assault</option><option>Online fraud</option>
+              <option>Burglary</option><option>Harassment</option><option>Missing person</option>
+              <option>Property damage</option><option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label for="when">Date and time *</label>
+            <input id="when" type="datetime-local" required>
+          </div>
+          <div class="full">
+            <label for="place">Where did it happen? *</label>
+            <input id="place" placeholder="Road, landmark or area" required>
+          </div>
+          <div class="full">
+            <label for="story">What happened? *</label>
+            <textarea id="story" placeholder="Who did it, what they did, which way they went, any vehicle, cameras or witnesses..." required></textarea>
+            <div class="voice">
+              <button type="button" class="btn mic" id="mic">Speak</button>
+              <select id="lang" aria-label="Speaking language">
+                <option value="en-IN">English (India)</option>
+                <option value="ml-IN">Malayalam</option>
+                <option value="hi-IN">Hindi</option>
+                <option value="ta-IN">Tamil</option>
+              </select>
+              <span id="voiceState" role="status" aria-live="polite"></span>
+            </div>
+          </div>
+          <div class="full">
+            <label for="evidence">Photo or document (optional)</label>
+            <input id="evidence" type="file" accept="image/jpeg,image/png,application/pdf">
+            <p class="note">JPG, PNG or PDF, up to 5 MB. Demo only: the file stays on your device and is not uploaded.</p>
+            <div id="preview"></div>
+          </div>
+        </div>
+
+        <label class="consent">
+          <input type="checkbox" id="agree" required>
+          <span>I understand this is a demonstration. Submitting it will not notify the police or create an official complaint.</span>
+        </label>
+
+        <button type="submit" class="btn btn-primary submit">Submit demo complaint</button>
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <aside class="card side">
+      <h3>Statement checklist</h3>
+      <ul class="tips" id="tips">
+        <li data-k="what">What happened<small>At least a short description</small></li>
+        <li data-k="when">When<small>Date and time</small></li>
+        <li data-k="where">Where<small>Road, landmark or area</small></li>
+        <li data-k="who">Person or vehicle<small>Clothes, colour, number plate</small></li>
+        <li data-k="how">Direction and cameras<small>Which way they went, witnesses</small></li>
+      </ul>
+      <div class="links">
+        <a href="citizen-dashboard.html">&larr; My dashboard</a>
+        <a href="index.html">Home</a>
+        <a href="login.html">Login</a>
+        <a href="register.html">Create an account</a>
+      </div>
+    </aside>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="fl"><a href="index.html">Home</a><a href="citizen-dashboard.html">Dashboard</a><a href="login.html">Login</a><a href="register.html">Register</a></div>
+  <p>&copy; 2026 CRIMVEXA AI. Student project demonstration.</p>
+</footer>
+
+<script src="app.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const form=$('complaintForm'),story=$('story'),msg=$('msg');
+
+  const pad=n=>String(n).padStart(2,'0'),d=new Date();
+  $('when').max=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const RX={who:/\b(man|men|boy|woman|girl|person|bike|car|scooter|van|auto|wearing|helmet|plate|black|red|white|blue)\b/i,
+            how:/\b(camera|cctv|witness|ran|fled|towards|left|direction|north|south|east|west|bridge|escaped)\b/i};
+  function check(){
+    const t=story.value;
+    const state={what:t.trim().length>=10,when:!!$('when').value,where:$('place').value.trim().length>2,who:RX.who.test(t),how:RX.how.test(t)};
+    document.querySelectorAll('#tips li').forEach(li=>li.classList.toggle('ok',state[li.dataset.k]));
+  }
+  ['input','change'].forEach(e=>form.addEventListener(e,check));
+
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
+  $('mic').onclick=function(){
+    if(!SR){$('voiceState').textContent='Voice input is not supported in this browser. Type your statement.';return}
+    if(rec){rec.stop();return}
+    rec=new SR();rec.lang=$('lang').value;rec.interimResults=false;rec.continuous=true;
+    rec.onstart=()=>{$('mic').textContent='Stop';$('mic').classList.add('live');$('voiceState').textContent='Listening...'};
+    rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)story.value+=(story.value&&!/\s$/.test(story.value)?' ':'')+e.results[i][0].transcript.trim()}check()};
+    rec.onerror=()=>{$('voiceState').textContent='Could not hear you. Try again or type.'};
+    rec.onend=()=>{rec=null;$('mic').textContent='Speak';$('mic').classList.remove('live');if($('voiceState').textContent==='Listening...')$('voiceState').textContent='Stopped.'};
+    rec.start();
+  };
+
+  $('evidence').onchange=function(){
+    const box=$('preview');box.textContent='';const f=this.files[0];if(!f)return;
+    if(f.size>5*1024*1024){this.value='';box.textContent='That file is over 5 MB. Choose a smaller one.';return}
+    if(f.type.startsWith('image/')){const img=new Image();img.alt='Selected evidence';img.src=URL.createObjectURL(f);box.append(img)}
+    else if(f.type==='application/pdf'){const note=document.createElement('p');note.textContent='Selected file: '+f.name;box.append(note)}
+  };
+
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    const requiredFields=['name','email','category','when','place','story'];
+    const missing=requiredFields.filter(id=>!$(id).value.trim());
+    if(missing.length || !$('agree').checked){
+      msg.className='msg bad';
+      msg.textContent='Please complete all required fields and confirm the demo notice before submitting.';
+      return;
+    }
+
+    const caseId = window.Crimvexa.generateCaseId();
+    const analysis = window.Crimvexa.buildAnalysis($('story').value, $('place').value, $('category').value);
+    const report = {
+      id: caseId,
+      reporterName: $('name').value.trim(),
+      email: $('email').value.trim(),
+      incidentType: $('category').value,
+      incidentDate: $('when').value.slice(0,10),
+      location: $('place').value.trim(),
+      description: $('story').value.trim(),
+      language: $('lang').value,
+      category: analysis.category,
+      status: 'SUBMITTED',
+      analysis: {
+        level: analysis.priority.level,
+        score: analysis.priority.score,
+        reasons: analysis.priority.reasons,
+        missingFields: analysis.missingFields
+      },
+      caseLinks: analysis.caseLinks,
+      evidence: $('evidence').files && $('evidence').files.length ? [{ name: $('evidence').files[0].name, type: $('evidence').files[0].type || 'unknown' }] : [],
+      createdAt: new Date().toISOString(),
+      statusHistory: [{ status: 'SUBMITTED', timestamp: new Date().toISOString(), actor: 'Citizen', note: 'Complaint submitted by citizen.' }]
+    };
+
+    const saved = window.Crimvexa.addCase(report);
+    msg.className='msg ok';
+    msg.innerHTML=`Demo complaint submitted successfully. <a href="receipt.html?caseId=${saved.id}">View receipt</a>`;
+    form.reset();
+    check();
+    setTimeout(() => {
+      window.location.href = `receipt.html?caseId=${saved.id}`;
+    }, 700);
+  });
+})();

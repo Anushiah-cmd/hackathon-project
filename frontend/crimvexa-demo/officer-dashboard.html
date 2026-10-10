@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Officer Dashboard | CRIMVEXA AI</title>
+  <style>
+    :root {
+      --navy: #0b1120;
+      --navy2: #111b33;
+      --line: #24345a;
+      --ink: #f4f6fb;
+      --muted: #a9b6d3;
+      --red: #e5484d;
+      --paper: #ffffff;
+      --text: #172033;
+      --soft: #64748b;
+      --bg: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f8fafc;
+      color: var(--text);
+    }
+    a { color: inherit; text-decoration: none; }
+    header {
+      background: #0b1120;
+      color: #fff;
+      padding: 16px 5%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { font-size: 1.2rem; font-weight: 800; }
+    .nav { display: flex; gap: 18px; flex-wrap: wrap; }
+    .nav a { color: var(--muted); }
+    .nav a:hover { color: #fff; }
+    .container { max-width: 1280px; margin: 28px auto; padding: 0 20px 40px; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.8rem); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+    }
+    .stat .label { display: block; color: var(--soft); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat .value { display: block; margin-top: 8px; font-size: 2rem; font-weight: 800; color: var(--navy2); }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.6fr 0.9fr;
+      gap: 20px;
+    }
+    .panel {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 7px 20px rgba(15, 23, 42, 0.04);
+    }
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    select {
+      width: 100%;
+      max-width: 220px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 14px;
+    }
+    .case-list { display: flex; flex-direction: column; gap: 12px; }
+    .case-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .case-card:hover { border-color: #94a3b8; transform: translateY(-1px); }
+    .case-card.active { border-color: var(--red); background: #fff5f5; }
+    .case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .case-id { font-weight: 800; }
+    .tag {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tag.high { background: #fee2e2; color: #991b1b; }
+    .tag.medium { background: #fef3c7; color: #92400e; }
+    .tag.low { background: #dcfce7; color: #166534; }
+    .meta { color: var(--soft); font-size: 13px; line-height: 1.7; }
+    .detail h2 { margin: 0 0 14px; }
+    .detail .key { font-weight: 700; }
+    .detail p { color: var(--soft); line-height: 1.8; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    .btn {
+      display: inline-block;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--red); color: #fff; }
+    .btn-success { background: #dcfce7; color: #166534; }
+    .btn-warn { background: #fff7ed; color: #9a5b00; }
+    .btn-outline { border-color: #cbd5e1; background: white; color: var(--text); }
+    .mini-list { margin: 0; padding-left: 18px; color: var(--soft); line-height: 1.8; }
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">CRIMVEXA AI</div>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="citizen-dashboard.html">Citizen</a>
+      <a href="complaint.html">Report</a>
+      <a href="receipt.html">Receipt</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="topbar">
+      <h1>Officer dashboard</h1>
+      <a href="mock-portal.html" class="btn btn-outline">Open mock portal</a>
+    </div>
+
+    <section class="stats">
+      <div class="stat"><span class="label">New</span><span class="value" id="countNew">0</span></div>
+      <div class="stat"><span class="label">Under review</span><span class="value" id="countReview">0</span></div>
+      <div class="stat"><span class="label">Needs info</span><span class="value" id="countInfo">0</span></div>
+      <div class="stat"><span class="label">Resolved</span><span class="value" id="countResolved">0</span></div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="filters">
+          <label for="statusFilter" class="key">Filter</label>
+          <select id="statusFilter">
+            <option value="ALL">All statuses</option>
+            <option value="SUBMITTED">Submitted</option>
+            <option value="UNDER_REVIEW">Under review</option>
+            <option value="NEEDS_INFORMATION">Needs information</option>
+            <option value="RESOLVED">Resolved</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+        </div>
+        <div id="caseList" class="case-list"></div>
+      </section>
+
+      <aside class="panel detail" id="detailPanel">
+        <h2>Select a case</h2>
+        <p>No complaint selected yet.</p>
+      </aside>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (function () {
+      const filter = document.getElementById('statusFilter');
+      const caseList = document.getElementById('caseList');
+      const detailPanel = document.getElementById('detailPanel');
+      let selectedCaseId = null;
+
+      function getCases() {
+        return window.Crimvexa.loadData().cases.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+
+      function renderSummary() {
+        const cases = getCases();
+        document.getElementById('countNew').textContent = cases.filter((c) => c.status === 'SUBMITTED').length;
+        document.getElementById('countReview').textContent = cases.filter((c) => c.status === 'UNDER_REVIEW').length;
+        document.getElementById('countInfo').textContent = cases.filter((c) => c.status === 'NEEDS_INFORMATION').length;
+        document.getElementById('countResolved').textContent = cases.filter((c) => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
+      }
+
+      function renderDetail(caseData) {
+        if (!caseData) {
+          detailPanel.innerHTML = '<h2>Select a case</h2><p>No complaint selected yet.</p>';
+          return;
+        }
+
+        const links = (caseData.caseLinks || []).filter((link) => link.id !== 'NO-LINKS').map((link) => `<li>${link.id} • ${link.reason}</li>`).join('') || '<li>No case links available.</li>';
+
+        detailPanel.innerHTML = `
+          <h2>${caseData.id}</h2>
+          <p><span class="key">Reporter:</span> ${caseData.reporterName}</p>
+          <p><span class="key">Type:</span> ${caseData.incidentType}</p>
+          <p><span class="key">Location:</span> ${caseData.location}</p>
+          <p><span class="key">Priority:</span> ${caseData.analysis.level} (${caseData.analysis.score})</p>
+          <p><span class="key">Description:</span> ${caseData.description}</p>
+          <p><span class="key">Reasoning:</span> ${caseData.analysis.reasons.join(', ')}</p>
+          <h3>Possible links</h3>
+          <ul class="mini-list">${links}</ul>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="UNDER_REVIEW">Mark under review</button>
+            <button class="btn btn-warn" data-action="NEEDS_INFORMATION">Request info</button>
+            <button class="btn btn-success" data-action="RESOLVED">Resolve</button>
+          </div>
+        `;
+
+        detailPanel.querySelectorAll('[data-action]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const action = button.getAttribute('data-action');
+            window.Crimvexa.updateStatus(caseData.id, action, 'Officer', `Officer marked the case as ${action.toLowerCase().replace(/_/g, ' ')}.`);
+            render();
+          });
+        });
+      }
+
+      function renderList() {
+        const cases = getCases();
+        const currentFilter = filter.value;
+        const filtered = currentFilter === 'ALL' ? cases : cases.filter((item) => item.status === currentFilter);
+
+        if (!filtered.length) {
+          caseList.innerHTML = '<p>No cases match the selected filter.</p>';
+          return;
+        }
+
+        caseList.innerHTML = filtered.map((item) => `
+          <div class="case-card ${selectedCaseId === item.id ? 'active' : ''}" data-id="${item.id}">
+            <div class="case-header">
+              <div class="case-id">${item.id}</div>
+              <span class="tag ${item.analysis.level.toLowerCase()}">${item.analysis.level}</span>
+            </div>
+            <div class="meta">${item.incidentType} • ${window.Crimvexa.formatDate(item.createdAt)}</div>
+            <div class="meta"><strong>Status:</strong> ${item.status}</div>
+            <div class="meta">${item.location}</div>
+          </div>
+        `).join('');
+
+        caseList.querySelectorAll('.case-card').forEach((card) => {
+          card.addEventListener('click', () => {
+            selectedCaseId = card.getAttribute('data-id');
+            renderList();
+            renderDetail(window.Crimvexa.getCaseById(selectedCaseId));
+          });
+        });
+      }
+
+      function render() {
+        renderSummary();
+        renderList();
+        if (!selectedCaseId) {
+          const firstCase = getCases()[0];
+          selectedCaseId = firstCase ? firstCase.id : null;
+        }
+        renderDetail(window.Crimvexa.getCaseById(selectedCaseId));
+      }
+
+      filter.addEventListener('change', renderList);
+      render();
+    })();
+  </script>
+</body>
+</html>

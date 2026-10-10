@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Complaint Receipt | CRIMVEXA AI</title>
+  <style>
+    :root {
+      --navy: #0b1120;
+      --navy2: #111b33;
+      --line: #24345a;
+      --ink: #f4f6fb;
+      --muted: #a9b6d3;
+      --red: #e5484d;
+      --paper: #ffffff;
+      --text: #172033;
+      --soft: #64748b;
+      --success: #166534;
+      --success-bg: #f0fdf4;
+      --warn: #92400e;
+      --warn-bg: #fef3c7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(180deg, #0b1120 0%, #0f1d3d 18%, #f8fafc 18%, #f8fafc 100%);
+      color: var(--text);
+    }
+    a { color: inherit; text-decoration: none; }
+    header {
+      background: rgba(11,17,32,0.95);
+      border-bottom: 1px solid var(--line);
+      padding: 16px 5%;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand { font-size: 1.2rem; font-weight: 800; }
+    .nav { display: flex; gap: 18px; flex-wrap: wrap; }
+    .nav a { color: var(--muted); }
+    .nav a:hover { color: #fff; }
+    .main { max-width: 980px; margin: 32px auto; padding: 0 20px 40px; }
+    .receipt-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #0f1d3d, #0b1120 65%, #2a1218);
+      color: white;
+      padding: 32px 28px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(229,72,77,0.18);
+      color: #ffd8d8;
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .title {
+      margin: 16px 0 8px;
+      font-size: clamp(2rem, 4vw, 2.8rem);
+    }
+    .subtitle { color: var(--muted); max-width: 60ch; }
+    .content { padding: 24px 28px 30px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .label { display: block; color: var(--soft); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .value { display: block; margin-top: 6px; font-size: 1.2rem; font-weight: 800; color: var(--text); }
+    .section {
+      margin-top: 20px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .section h3 { margin: 0 0 12px; font-size: 1.1rem; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .meta { color: var(--soft); line-height: 1.8; }
+    .timeline { list-style: none; padding-left: 0; margin: 0; }
+    .timeline li {
+      border-left: 2px solid #dbeafe;
+      padding: 0 0 16px 14px;
+      position: relative;
+    }
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      left: -7px;
+      top: 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(229,72,77,0.12);
+    }
+    .timeline strong { display: block; margin-bottom: 4px; }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--red); color: #fff; }
+    .btn-secondary { background: #fff; color: var(--text); border-color: #cbd5e1; }
+    .btn-secondary:hover { background: #f8fafc; }
+    @media (max-width: 720px) {
+      .stats, .summary-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">CRIMVEXA AI</div>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="citizen-dashboard.html">Dashboard</a>
+      <a href="complaint.html">Report</a>
+      <a href="officer-dashboard.html">Officer</a>
+    </nav>
+  </header>
+
+  <main class="main">
+    <section class="receipt-card">
+      <div class="header">
+        <span class="badge">Demo complaint receipt</span>
+        <h1 class="title">Case confirmed</h1>
+        <div class="subtitle" id="receiptSummary">Your fictional complaint has been saved and is ready for review.</div>
+      </div>
+      <div class="content">
+        <div class="stats">
+          <div class="stat">
+            <span class="label">Case ID</span>
+            <span class="value" id="caseId">—</span>
+          </div>
+          <div class="stat">
+            <span class="label">Status</span>
+            <span class="value" id="caseStatus">—</span>
+          </div>
+          <div class="stat">
+            <span class="label">Priority</span>
+            <span class="value" id="priorityLevel">—</span>
+          </div>
+          <div class="stat">
+            <span class="label">Created</span>
+            <span class="value" id="createdAt">—</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Complaint overview</h3>
+          <div class="summary-grid">
+            <div class="meta" id="complaintMeta"></div>
+            <div class="meta" id="analysisMeta"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>Status timeline</h3>
+          <ul class="timeline" id="timeline"></ul>
+        </div>
+
+        <div class="buttons">
+          <a href="citizen-dashboard.html" class="btn btn-primary">View dashboard</a>
+          <a href="mock-portal.html" class="btn btn-secondary">Open mock portal</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const caseId = params.get('caseId') || 'CVX-DEMO-0001';
+      const caseData = window.Crimvexa.getCaseById(caseId);
+
+      if (!caseData) {
+        document.getElementById('receiptSummary').textContent = 'No saved complaint was found for this ID.';
+        return;
+      }
+
+      const statusEl = document.getElementById('caseStatus');
+      const priorityEl = document.getElementById('priorityLevel');
+      const caseIdEl = document.getElementById('caseId');
+      const createdAtEl = document.getElementById('createdAt');
+      const complaintMetaEl = document.getElementById('complaintMeta');
+      const analysisMetaEl = document.getElementById('analysisMeta');
+      const timelineEl = document.getElementById('timeline');
+
+      caseIdEl.textContent = caseData.id;
+      statusEl.textContent = caseData.status;
+      priorityEl.textContent = `${caseData.analysis.level} (${caseData.analysis.score})`;
+      createdAtEl.textContent = window.Crimvexa.formatDate(caseData.createdAt);
+      document.getElementById('receiptSummary').textContent = `Complaint saved for ${caseData.reporterName}. A demo officer review has started.`;
+
+      complaintMetaEl.innerHTML = `
+        <div><strong>Reporter:</strong> ${caseData.reporterName || 'Anonymous'}</div>
+        <div><strong>Incident:</strong> ${caseData.incidentType || 'Not specified'}</div>
+        <div><strong>Date:</strong> ${caseData.incidentDate || 'Not specified'}</div>
+        <div><strong>Location:</strong> ${caseData.location || 'Not specified'}</div>
+        <div><strong>Summary:</strong> ${caseData.description || 'No description yet.'}</div>
+      `;
+
+      analysisMetaEl.innerHTML = `
+        <div><strong>Category:</strong> ${caseData.category || 'OTHER'}</div>
+        <div><strong>Priority reasons:</strong> ${caseData.analysis.reasons.join(', ')}</div>
+        <div><strong>Missing detail checks:</strong> ${(caseData.analysis.missingFields || []).join(', ') || 'None'}</div>
+        <div><strong>Possible case links:</strong> ${(caseData.caseLinks || []).map((link) => link.id).join(', ') || 'None'}</div>
+      `;
+
+      const timeline = Array.isArray(caseData.statusHistory) ? caseData.statusHistory : [];
+      timelineEl.innerHTML = timeline.map((entry) => `
+        <li>
+          <strong>${entry.status}</strong>
+          <div>${entry.note || 'Updated by the system.'}</div>
+          <small>${window.Crimvexa.formatDate(entry.timestamp)}</small>
+        </li>
+      `).join('');
+    })();
+  </script>
+</body>
+</html>
