@@ -6,7 +6,7 @@ PROTOTYPE: Stores fictional/demonstration data only in local SQLite.
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -16,6 +16,14 @@ from analysis import classify, detect_missing, find_similar
 complaints_bp = Blueprint("complaints", __name__)
 
 VALID_STATUSES = {"New", "Under Review", "Resolved"}
+TEXT_LIMITS = {
+    "description": 10000,
+    "location": 500,
+    "incident_time": 100,
+    "item_details": 1000,
+    "escape_direction": 1000,
+    "preferred_language": 20,
+}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,30 +56,65 @@ def _build_briefing(complaint: dict, missing: list, similar: list) -> dict:
     }
 
 
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _json_object():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None, (jsonify({
+            "error": "Request body must be a JSON object."
+        }), 400)
+    return data, None
+
+
 # ── POST /api/complaints ──────────────────────────────────────────────────────
 
 @complaints_bp.route("/complaints", methods=["POST"])
 def submit_complaint():
-    data = request.get_json(silent=True) or {}
+    data, error = _json_object()
+    if error:
+        return error
 
-    # Minimum validation — description required
-    description = (data.get("description") or "").strip()
+    description = data.get("description")
+    if not isinstance(description, str):
+        description = ""
+    description = description.strip()
     if not description:
         return jsonify({
             "error": "description is required and cannot be empty."
         }), 400
+    if len(description) > TEXT_LIMITS["description"]:
+        return jsonify({
+            "error": f"description must be at most {TEXT_LIMITS['description']} characters."
+        }), 400
+
+    fields = {}
+    for field, limit in TEXT_LIMITS.items():
+        if field == "description":
+            continue
+        value = data.get(field)
+        if value is not None and not isinstance(value, str):
+            return jsonify({"error": f"{field} must be a string."}), 400
+        value = value.strip() if isinstance(value, str) else ""
+        if len(value) > limit:
+            return jsonify({
+                "error": f"{field} must be at most {limit} characters."
+            }), 400
+        fields[field] = value or ("en" if field == "preferred_language" else None)
 
     complaint_id = "CW-" + uuid.uuid4().hex[:8].upper()
-    now = datetime.utcnow().isoformat()
+    now = _utc_now()
 
     complaint = {
         "complaint_id":       complaint_id,
         "description":        description,
-        "location":           (data.get("location") or "").strip() or None,
-        "incident_time":      (data.get("incident_time") or "").strip() or None,
-        "item_details":       (data.get("item_details") or "").strip() or None,
-        "escape_direction":   (data.get("escape_direction") or "").strip() or None,
-        "preferred_language": (data.get("preferred_language") or "en").strip(),
+        "location":           fields["location"],
+        "incident_time":      fields["incident_time"],
+        "item_details":       fields["item_details"],
+        "escape_direction":   fields["escape_direction"],
+        "preferred_language": fields["preferred_language"],
         "status":             "New",
         "created_at":         now,
         "updated_at":         now,
@@ -114,12 +157,22 @@ def submit_complaint():
 
     return jsonify({
         "complaint_id": complaint_id,
-        "status":       "New",
-        "category":     classification["category"],
-        "priority":     classification["priority"],
+        "description": description,
+        "location": fields["location"],
+        "incident_time": fields["incident_time"],
+        "item_details": fields["item_details"],
+        "escape_direction": fields["escape_direction"],
+        "preferred_language": fields["preferred_language"],
+        "status": "New",
+        "category": classification["category"],
+        "priority": classification["priority"],
+        "category_reason": classification["category_reason"],
+        "priority_reason": classification["priority_reason"],
         "missing_fields": missing,
-        "similar_cases":  similar,
-        "briefing":       briefing,
+        "similar_cases": similar,
+        "briefing": briefing,
+        "created_at": now,
+        "updated_at": now,
         "note": (
             "✅ Complaint saved as a local demonstration draft. "
             "This is NOT submitted to any real police authority."
@@ -180,7 +233,7 @@ def analyze_complaint(complaint_id):
         {**complaint, **classification}, missing, similar
     )
 
-    now = datetime.utcnow().isoformat()
+    now = _utc_now()
     with get_connection() as conn:
         conn.execute("""
             UPDATE complaints
@@ -226,8 +279,13 @@ def analyze_complaint(complaint_id):
 
 @complaints_bp.route("/complaints/<complaint_id>/status", methods=["PATCH"])
 def update_status(complaint_id):
-    data       = request.get_json(silent=True) or {}
-    new_status = (data.get("status") or "").strip()
+    data, error = _json_object()
+    if error:
+        return error
+    new_status = data.get("status")
+    if not isinstance(new_status, str):
+        new_status = ""
+    new_status = new_status.strip()
 
     if new_status not in VALID_STATUSES:
         return jsonify({
@@ -243,7 +301,7 @@ def update_status(complaint_id):
         if not row:
             return jsonify({"error": f"Complaint '{complaint_id}' not found."}), 404
 
-        now = datetime.utcnow().isoformat()
+        now = _utc_now()
         conn.execute(
             "UPDATE complaints SET status = ?, updated_at = ? WHERE complaint_id = ?",
             (new_status, now, complaint_id)

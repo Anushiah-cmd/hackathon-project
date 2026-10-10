@@ -58,9 +58,17 @@ Content-Type: application/json
 ```json
 {
   "complaint_id": "CW-A1B2C3D4",
+  "description": "My phone was snatched near the bus stand.",
+  "location": "Central Bus Stand, Chennai",
+  "incident_time": "2024-01-15 18:30",
+  "item_details": "iPhone 13, black",
+  "escape_direction": "Towards Anna Salai",
+  "preferred_language": "en",
   "status": "New",
   "category": "Theft",
   "priority": "Medium",
+  "category_reason": "Keywords detected: snatched, phone",
+  "priority_reason": "Category suggests medium priority by default.",
   "missing_fields": [],
   "similar_cases": [
     {
@@ -72,7 +80,9 @@ Content-Type: application/json
   ],
   "briefing": { "...": "..." },
   "note": "✅ Complaint saved as a local demonstration draft. This is NOT submitted to any real police authority.",
-  "disclaimer": "⚠️ Automated suggestion only. Requires human officer review."
+  "disclaimer": "⚠️ Automated suggestion only. Requires human officer review.",
+  "created_at": "2026-10-10T12:00:00+00:00",
+  "updated_at": "2026-10-10T12:00:00+00:00"
 }
 ```
 
@@ -80,6 +90,11 @@ Content-Type: application/json
 ```json
 { "error": "description is required and cannot be empty." }
 ```
+
+The request body must be a JSON object. `description` is required and limited
+to 10,000 characters. Optional text fields must be strings and are length
+limited; invalid JSON shapes, field types, and oversized values return HTTP
+400. Requests larger than 64 KiB return HTTP 413.
 
 ---
 

@@ -1,161 +1,176 @@
 """
 CRIMVEXA WITNESS -- Backend Tests
-Run with:  python test_backend.py
+Run with: python test_backend.py
 """
 
 import json
-import sys
+import os
+import tempfile
 import unittest
 
-# Start the app in test mode before importing routes
 import app as app_module
-flask_app = app_module.create_app()
-flask_app.config["TESTING"] = True
+from database import get_connection
 
 
 class CrimvexaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = tempfile.TemporaryDirectory()
+        cls.database_path = os.path.join(cls.temp_dir.name, "test-crimvexa.db")
+        cls.flask_app = app_module.create_app({
+            "TESTING": True,
+            "DATABASE": cls.database_path,
+        })
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp_dir.cleanup()
 
     def setUp(self):
-        self.client = flask_app.test_client()
+        self.client = self.flask_app.test_client()
+        with self.flask_app.app_context():
+            with get_connection() as conn:
+                conn.execute("DELETE FROM complaints")
 
-    # -- 1. Health check -------------------------------------------------------
-    def test_01_health(self):
-        r = self.client.get("/api/health")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json["status"], "ok")
-        print("[PASS] test_01_health")
+    def submit(self, payload=None):
+        return self.client.post(
+            "/api/complaints",
+            data=json.dumps(payload or {
+                "description": (
+                    "My mobile phone was snatched near the bus stand "
+                    "by someone on a motorcycle."
+                ),
+                "location": "Central Bus Stand, Chennai",
+                "incident_time": "2024-01-15 18:30",
+                "item_details": "Black mobile phone",
+                "escape_direction": "Towards Anna Salai",
+            }),
+            content_type="application/json",
+        )
 
-    # -- 2. Valid complaint submission -----------------------------------------
-    def test_02_submit_valid(self):
-        payload = {
-            "description": "My mobile phone was snatched near the bus stand by someone on a motorcycle.",
-            "location": "Central Bus Stand, Chennai",
-            "incident_time": "2024-01-15 18:30",
-            "item_details": "iPhone 13, black colour, worth 60000",
-            "escape_direction": "Towards Anna Salai"
-        }
-        r = self.client.post("/api/complaints",
-                             data=json.dumps(payload),
-                             content_type="application/json")
-        self.assertEqual(r.status_code, 201)
-        data = r.json
-        self.assertIn("complaint_id", data)
-        self.assertTrue(data["complaint_id"].startswith("CW-"))
+    def test_health_check(self):
+        response = self.client.get("/api/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["status"], "ok")
+
+    def test_submit_returns_complete_persisted_draft(self):
+        response = self.submit()
+        self.assertEqual(response.status_code, 201)
+        data = response.json
+        self.assertRegex(data["complaint_id"], r"^CW-[A-F0-9]{8}$")
+        self.assertTrue(data["description"].startswith("My mobile phone"))
+        self.assertEqual(data["location"], "Central Bus Stand, Chennai")
         self.assertEqual(data["status"], "New")
-        CrimvexaTests._cid = data["complaint_id"]
-        print(f"[PASS] test_02_submit_valid -> {data['complaint_id']}")
-
-    # -- 3. Invalid complaint (no description) ---------------------------------
-    def test_03_submit_invalid(self):
-        r = self.client.post("/api/complaints",
-                             data=json.dumps({"location": "Somewhere"}),
-                             content_type="application/json")
-        self.assertEqual(r.status_code, 400)
-        self.assertIn("error", r.json)
-        print("[PASS] test_03_submit_invalid")
-
-    # -- 4. List complaints ----------------------------------------------------
-    def test_04_list_complaints(self):
-        r = self.client.get("/api/complaints")
-        self.assertEqual(r.status_code, 200)
-        self.assertIn("complaints", r.json)
-        self.assertIsInstance(r.json["complaints"], list)
-        print(f"[PASS] test_04_list_complaints -> {r.json['total']} complaint(s)")
-
-    # -- 5. Get specific complaint ---------------------------------------------
-    def test_05_get_complaint(self):
-        cid = getattr(CrimvexaTests, "_cid", None)
-        if not cid:
-            self.skipTest("No complaint ID from earlier test")
-        r = self.client.get(f"/api/complaints/{cid}")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json["complaint_id"], cid)
-        print(f"[PASS] test_05_get_complaint -> {cid}")
-
-    # -- 6. Unknown complaint ID -----------------------------------------------
-    def test_06_get_unknown(self):
-        r = self.client.get("/api/complaints/CW-NOTREAL")
-        self.assertEqual(r.status_code, 404)
-        print("[PASS] test_06_get_unknown")
-
-    # -- 7. Analyze complaint --------------------------------------------------
-    def test_07_analyze(self):
-        cid = getattr(CrimvexaTests, "_cid", None)
-        if not cid:
-            self.skipTest("No complaint ID from earlier test")
-        r = self.client.post(f"/api/complaints/{cid}/analyze")
-        self.assertEqual(r.status_code, 200)
-        data = r.json
         self.assertIn("category", data)
         self.assertIn("priority", data)
-        self.assertIn("missing_fields", data)
-        self.assertIn("similar_cases", data)
-        print(f"[PASS] test_07_analyze -> {data['category']} / {data['priority']}")
+        self.assertIsInstance(data["missing_fields"], list)
+        self.assertIsInstance(data["similar_cases"], list)
+        self.assertIn("NOT submitted", data["note"])
 
-    # -- 8. Category & priority suggestions ------------------------------------
-    def test_08_category_priority(self):
-        payload = {
-            "description": "I received a fake OTP call and 20000 was transferred from my bank account."
-        }
-        r = self.client.post("/api/complaints",
-                             data=json.dumps(payload),
-                             content_type="application/json")
-        self.assertEqual(r.status_code, 201)
-        data = r.json
-        self.assertEqual(data["category"], "Online / Cyber Fraud")
-        print(f"[PASS] test_08_category_priority -> {data['category']} / {data['priority']}")
+        stored = self.client.get(f"/api/complaints/{data['complaint_id']}")
+        self.assertEqual(stored.status_code, 200)
+        self.assertEqual(stored.json["description"], data["description"])
+        self.assertEqual(stored.json["location"], data["location"])
 
-    # -- 9. Similar synthetic case matching ------------------------------------
-    def test_09_similar_cases(self):
-        cid = getattr(CrimvexaTests, "_cid", None)
-        if not cid:
-            self.skipTest("No complaint ID from earlier test")
-        r = self.client.post(f"/api/complaints/{cid}/analyze")
-        similar = r.json.get("similar_cases", [])
-        self.assertIsInstance(similar, list)
-        if similar:
-            self.assertIn("case_id", similar[0])
-        print(f"[PASS] test_09_similar_cases -> {len(similar)} match(es)")
+    def test_submit_requires_nonempty_description(self):
+        response = self.submit({"description": "   "})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json)
 
-    # -- 10. Valid status update -----------------------------------------------
-    def test_10_status_update_valid(self):
-        cid = getattr(CrimvexaTests, "_cid", None)
-        if not cid:
-            self.skipTest("No complaint ID from earlier test")
-        r = self.client.patch(f"/api/complaints/{cid}/status",
-                              data=json.dumps({"status": "Under Review"}),
-                              content_type="application/json")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json["status"], "Under Review")
-        print("[PASS] test_10_status_update_valid")
+    def test_submit_rejects_non_object_json(self):
+        response = self.client.post(
+            "/api/complaints",
+            data=json.dumps(["not", "an", "object"]),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("JSON object", response.json["error"])
 
-    # -- 11. Invalid status update ---------------------------------------------
-    def test_11_status_update_invalid(self):
-        cid = getattr(CrimvexaTests, "_cid", None)
-        if not cid:
-            self.skipTest("No complaint ID from earlier test")
-        r = self.client.patch(f"/api/complaints/{cid}/status",
-                              data=json.dumps({"status": "CLOSED_FOREVER"}),
-                              content_type="application/json")
-        self.assertEqual(r.status_code, 400)
-        print("[PASS] test_11_status_update_invalid")
+    def test_submit_rejects_wrong_field_types_and_oversized_values(self):
+        wrong_type = self.submit({
+            "description": "A valid incident description",
+            "location": ["not", "text"],
+        })
+        self.assertEqual(wrong_type.status_code, 400)
+        self.assertIn("location", wrong_type.json["error"])
 
-    # -- 12. DB persistence ----------------------------------------------------
-    def test_12_persistence(self):
-        """Complaint submitted earlier must still be retrievable."""
-        cid = getattr(CrimvexaTests, "_cid", None)
-        if not cid:
-            self.skipTest("No complaint ID from earlier test")
-        r = self.client.get(f"/api/complaints/{cid}")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json["status"], "Under Review")
-        print("[PASS] test_12_persistence")
+        oversized = self.submit({"description": "x" * 10001})
+        self.assertEqual(oversized.status_code, 400)
+        self.assertIn("at most", oversized.json["error"])
+
+    def test_list_complaints(self):
+        self.submit()
+        response = self.client.get("/api/complaints")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["total"], 1)
+        self.assertEqual(len(response.json["complaints"]), 1)
+
+    def test_get_unknown_complaint(self):
+        response = self.client.get("/api/complaints/CW-NOTREAL")
+        self.assertEqual(response.status_code, 404)
+
+    def test_analysis_classifies_and_saves_suggestions(self):
+        created = self.submit({
+            "description": "A fake OTP call transferred money from my bank account."
+        }).json
+        response = self.client.post(
+            f"/api/complaints/{created['complaint_id']}/analyze"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["category"], "Online / Cyber Fraud")
+        self.assertIn("priority", response.json)
+        self.assertIsInstance(response.json["missing_fields"], list)
+        self.assertIsInstance(response.json["similar_cases"], list)
+
+        stored = self.client.get(
+            f"/api/complaints/{created['complaint_id']}"
+        ).json
+        self.assertEqual(stored["category"], response.json["category"])
+        self.assertIsInstance(stored["briefing"], dict)
+
+    def test_analysis_unknown_complaint(self):
+        response = self.client.post("/api/complaints/CW-NOTREAL/analyze")
+        self.assertEqual(response.status_code, 404)
+
+    def test_status_update_and_persistence(self):
+        complaint_id = self.submit().json["complaint_id"]
+        response = self.client.patch(
+            f"/api/complaints/{complaint_id}/status",
+            json={"status": "Under Review"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["status"], "Under Review")
+
+        stored = self.client.get(f"/api/complaints/{complaint_id}")
+        self.assertEqual(stored.json["status"], "Under Review")
+
+    def test_status_update_rejects_invalid_or_non_object_input(self):
+        complaint_id = self.submit().json["complaint_id"]
+        invalid = self.client.patch(
+            f"/api/complaints/{complaint_id}/status",
+            json={"status": "CLOSED_FOREVER"},
+        )
+        self.assertEqual(invalid.status_code, 400)
+
+        wrong_type = self.client.patch(
+            f"/api/complaints/{complaint_id}/status",
+            json={"status": ["Resolved"]},
+        )
+        self.assertEqual(wrong_type.status_code, 400)
+
+        non_object = self.client.patch(
+            f"/api/complaints/{complaint_id}/status",
+            json=["Resolved"],
+        )
+        self.assertEqual(non_object.status_code, 400)
+
+    def test_status_update_unknown_complaint(self):
+        response = self.client.patch(
+            "/api/complaints/CW-NOTREAL/status",
+            json={"status": "Resolved"},
+        )
+        self.assertEqual(response.status_code, 404)
 
 
 if __name__ == "__main__":
-    loader = unittest.TestLoader()
-    loader.sortTestMethodsUsing = lambda a, b: (a > b) - (a < b)
-    suite  = loader.loadTestsFromTestCase(CrimvexaTests)
-    runner = unittest.TextTestRunner(verbosity=0)
-    result = runner.run(suite)
-    sys.exit(0 if result.wasSuccessful() else 1)
+    unittest.main(verbosity=2)

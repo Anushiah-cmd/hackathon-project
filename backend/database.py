@@ -3,18 +3,37 @@ CRIMVEXA WITNESS — Database Setup (SQLite)
 Creates tables automatically on first startup.
 """
 
-import sqlite3
 import os
+import sqlite3
+from contextlib import contextmanager
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "crimvexa.db")
+from flask import current_app, has_app_context
+
+DEFAULT_DB_PATH = os.environ.get(
+    "CRIMVEXA_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "crimvexa.db"),
+)
 
 
+def _database_path():
+    if has_app_context():
+        return current_app.config["DATABASE"]
+    return DEFAULT_DB_PATH
+
+
+@contextmanager
 def get_connection():
-    """Return a SQLite connection with row_factory for dict-like rows."""
-    conn = sqlite3.connect(DB_PATH)
+    """Yield a transaction-scoped connection and always close it."""
+    db_path = _database_path()
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+    conn = sqlite3.connect(db_path, timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")   # safe for concurrent reads
-    return conn
+    conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def init_db():
@@ -41,4 +60,4 @@ def init_db():
                 updated_at      TEXT DEFAULT (datetime('now'))
             );
         """)
-    print("[DB] Tables ready ->", DB_PATH)
+    print("[DB] Tables ready ->", _database_path())
