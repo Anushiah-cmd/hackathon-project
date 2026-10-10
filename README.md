@@ -24,10 +24,10 @@ In a second terminal, serve the repository's `frontend` folder:
 
 ```powershell
 Set-Location frontend
-python -m http.server 8000
+python -m http.server 8001
 ```
 
-Open <http://127.0.0.1:8000/index.html>. The connected frontend calls the Flask
+Open <http://127.0.0.1:8001/index.html>. The connected frontend calls the Flask
 API, and complaint drafts persist in `backend/crimvexa.db`.
 
 The separate `frontend/crimvexa-demo` folder is a self-contained UI preview
