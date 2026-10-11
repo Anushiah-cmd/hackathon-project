@@ -156,9 +156,9 @@
   <main class="main">
     <section class="receipt-card">
       <div class="header">
-        <span class="badge">Demo complaint receipt</span>
-        <h1 class="title">Case confirmed</h1>
-        <div class="subtitle" id="receiptSummary">Your fictional complaint has been saved and is ready for review.</div>
+        <span class="badge">Case record</span>
+        <h1 class="title">Complaint details</h1>
+        <div class="subtitle" id="receiptSummary">Loading complaint details…</div>
       </div>
       <div class="content">
         <div class="stats">
@@ -189,67 +189,101 @@
         </div>
 
         <div class="section">
+          <h3>Evidence</h3>
+          <form id="evidenceForm">
+            <label for="evidenceFiles">Add evidence files (5 MB maximum per file)</label>
+            <input id="evidenceFiles" type="file" multiple accept="image/jpeg,image/png,application/pdf,text/plain,audio/mpeg,audio/wav,video/mp4,video/webm">
+            <button class="btn btn-secondary" type="submit">Upload evidence</button>
+            <p id="evidenceMessage" role="status"></p>
+          </form>
+          <ul id="evidenceList"></ul>
+        </div>
+
+        <div class="section">
           <h3>Status timeline</h3>
           <ul class="timeline" id="timeline"></ul>
         </div>
 
         <div class="buttons">
           <a href="citizen-dashboard.html" class="btn btn-primary">View dashboard</a>
-          <a href="mock-portal.html" class="btn btn-secondary">Open mock portal</a>
+          <a href="complaint.html" class="btn btn-secondary">Submit another complaint</a>
         </div>
       </div>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="api-client.js"></script>
   <script>
-    (function () {
+    (async function () {
       const params = new URLSearchParams(window.location.search);
-      const caseId = params.get('caseId') || 'CVX-DEMO-0001';
-      const caseData = window.Crimvexa.getCaseById(caseId);
-
-      if (!caseData) {
-        document.getElementById('receiptSummary').textContent = 'No saved complaint was found for this ID.';
-        return;
-      }
-
-      const statusEl = document.getElementById('caseStatus');
-      const priorityEl = document.getElementById('priorityLevel');
-      const caseIdEl = document.getElementById('caseId');
-      const createdAtEl = document.getElementById('createdAt');
-      const complaintMetaEl = document.getElementById('complaintMeta');
-      const analysisMetaEl = document.getElementById('analysisMeta');
-      const timelineEl = document.getElementById('timeline');
-
-      caseIdEl.textContent = caseData.id;
-      statusEl.textContent = caseData.status;
-      priorityEl.textContent = `${caseData.analysis.level} (${caseData.analysis.score})`;
-      createdAtEl.textContent = window.Crimvexa.formatDate(caseData.createdAt);
-      document.getElementById('receiptSummary').textContent = `Complaint saved for ${caseData.reporterName}. A demo officer review has started.`;
-
-      complaintMetaEl.innerHTML = `
-        <div><strong>Reporter:</strong> ${caseData.reporterName || 'Anonymous'}</div>
-        <div><strong>Incident:</strong> ${caseData.incidentType || 'Not specified'}</div>
-        <div><strong>Date:</strong> ${caseData.incidentDate || 'Not specified'}</div>
-        <div><strong>Location:</strong> ${caseData.location || 'Not specified'}</div>
-        <div><strong>Summary:</strong> ${caseData.description || 'No description yet.'}</div>
-      `;
-
-      analysisMetaEl.innerHTML = `
-        <div><strong>Category:</strong> ${caseData.category || 'OTHER'}</div>
-        <div><strong>Priority reasons:</strong> ${caseData.analysis.reasons.join(', ')}</div>
-        <div><strong>Missing detail checks:</strong> ${(caseData.analysis.missingFields || []).join(', ') || 'None'}</div>
-        <div><strong>Possible case links:</strong> ${(caseData.caseLinks || []).map((link) => link.id).join(', ') || 'None'}</div>
-      `;
-
-      const timeline = Array.isArray(caseData.statusHistory) ? caseData.statusHistory : [];
-      timelineEl.innerHTML = timeline.map((entry) => `
-        <li>
-          <strong>${entry.status}</strong>
-          <div>${entry.note || 'Updated by the system.'}</div>
-          <small>${window.Crimvexa.formatDate(entry.timestamp)}</small>
-        </li>
-      `).join('');
+      const caseId = params.get("caseId");
+      const $ = id => document.getElementById(id);
+      const summary = $("receiptSummary");
+      if (!caseId) { summary.textContent = "No complaint ID was provided."; return; }
+      try {
+        const user = await CrimvexaAPI.requireUser();
+        if (!user) return;
+        const record = await CrimvexaAPI.request(`/complaints/${encodeURIComponent(caseId)}`);
+        $("caseId").textContent = record.complaint_id;
+        $("caseStatus").textContent = record.status;
+        $("priorityLevel").textContent = record.priority || "Not analyzed";
+        $("createdAt").textContent = CrimvexaAPI.formatDate(record.created_at);
+        summary.textContent = `Saved for ${record.reporter_name || user.full_name}. It has not been sent to a police authority.`;
+        $("complaintMeta").textContent =
+          `Title: ${record.title}\nCategory reported: ${record.reported_category || "Not specified"}\nLocation: ${record.location || "Not specified"}\nIncident time: ${record.incident_time || "Not specified"}\nDescription: ${record.description}`;
+        $("complaintMeta").style.whiteSpace = "pre-line";
+        $("analysisMeta").textContent =
+          `Suggested category: ${record.category || "Not analyzed"}\nCategory reasoning: ${record.category_reason || "—"}\nPriority: ${record.priority || "Not analyzed"}\nPriority reasoning: ${record.priority_reason || "—"}\nDetails to confirm: ${(record.missing_fields || []).map(item => item.question).join("; ") || "None detected"}\nSimilar cases: ${(record.similar_cases || []).map(item => item.case_id).join(", ") || "None found"}`;
+        $("analysisMeta").style.whiteSpace = "pre-line";
+        $("timeline").replaceChildren();
+        (record.status_history || []).forEach(entry => {
+          const item = document.createElement("li");
+          const title = document.createElement("strong");
+          title.textContent = entry.new_status;
+          const note = document.createElement("span");
+          note.textContent = `${entry.note || ""} ${CrimvexaAPI.formatDate(entry.created_at)}`;
+          item.append(title, note);
+          $("timeline").append(item);
+        });
+        async function loadEvidence() {
+          const result = await CrimvexaAPI.request(`/complaints/${encodeURIComponent(caseId)}/evidence`);
+          const list = $("evidenceList");
+          list.replaceChildren();
+          result.evidence.forEach(file => {
+            const item = document.createElement("li");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-secondary";
+            button.textContent = `${file.original_name} (${Math.ceil(file.file_size / 1024)} KB)`;
+            button.addEventListener("click", async () => {
+              try {
+                const blob = await CrimvexaAPI.download(`/evidence/${encodeURIComponent(file.evidence_id)}/file`);
+                const url = URL.createObjectURL(blob);
+                window.open(url, "_blank", "noopener");
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+              } catch (error) { $("evidenceMessage").textContent = error.message; }
+            });
+            item.append(button);
+            list.append(item);
+          });
+        }
+        await loadEvidence();
+        $("evidenceForm").addEventListener("submit", async event => {
+          event.preventDefault();
+          const input = $("evidenceFiles");
+          const message = $("evidenceMessage");
+          if (!input.files.length) { message.textContent = "Select one or more files first."; return; }
+          const body = new FormData();
+          Array.from(input.files).forEach(file => body.append("files", file));
+          message.textContent = "Uploading…";
+          try {
+            await CrimvexaAPI.request(`/complaints/${encodeURIComponent(caseId)}/evidence`, { method: "POST", body });
+            input.value = "";
+            message.textContent = "Evidence uploaded and attached to this case.";
+            await loadEvidence();
+          } catch (error) { message.textContent = error.message; }
+        });
+      } catch (error) { summary.textContent = error.message; }
     })();
   </script>
 </body>

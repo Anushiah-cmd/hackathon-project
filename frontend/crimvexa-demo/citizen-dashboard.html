@@ -323,8 +323,7 @@
             <a href="index.html">Home</a>
             <a href="#report">Report a Crime</a>
             <a href="#complaints">My Complaints</a>
-            <a href="login.html">Login</a>
-            <a href="register.html">Register</a>
+            <a href="#" id="signOut">Sign out</a>
         </nav>
     </header>
 
@@ -335,7 +334,7 @@
             <h1>Citizen Dashboard</h1>
 
             <p>
-                Welcome to CRIMVEXA AI — an AI-assisted crime reporting
+                Welcome to CRIMVEXA AI — an automated analysis and case-tracking
                 platform designed to help citizens submit reports,
                 monitor complaint progress, and access safety information.
             </p>
@@ -351,17 +350,17 @@
         <section class="stats">
             <article class="stat-card">
                 <div class="number" id="totalReports">0</div>
-                <p>My Reports (Demo)</p>
+                <p>My Reports</p>
             </article>
 
             <article class="stat-card">
                 <div class="number" id="pendingReports">0</div>
-                <p>Pending Reports (Demo)</p>
+                <p>Open Reports</p>
             </article>
 
             <article class="stat-card">
                 <div class="number" id="reviewedReports">0</div>
-                <p>Reports Reviewed (Demo)</p>
+                <p>Resolved Reports</p>
             </article>
         </section>
 
@@ -419,12 +418,12 @@
                     >
 
                     <p class="notice">
-                        Demo only: do not upload real victim information or
-                        sensitive evidence. Files are not uploaded to a server.
+                        Files are uploaded to the local case server and linked
+                        to your complaint. Use synthetic data only.
                     </p>
 
                     <button type="submit" class="submit-button">
-                        Submit Demo Report
+                        Submit Report
                     </button>
 
                     <p id="reportMessage" class="notice"
@@ -444,7 +443,7 @@
 
                 <a href="#complaints" class="quick-link">
                     <strong>Track My Complaints</strong>
-                    <span>View demo reports and their current status.</span>
+                    <span>View submitted reports and their current status.</span>
                 </a>
 
                 <a href="index.html#how-it-works" class="quick-link">
@@ -452,9 +451,9 @@
                     <span>Learn about the CRIMVEXA AI reporting process.</span>
                 </a>
 
-                <a href="index.html#about" class="quick-link">
-                    <strong>About CRIMVEXA AI</strong>
-                    <span>Learn about the project and its features.</span>
+                <a href="index.html#features" class="quick-link">
+                    <strong>Application features</strong>
+                    <span>Review the current reporting and investigation tools.</span>
                 </a>
 
                 <a href="login.html" class="quick-link">
@@ -488,18 +487,19 @@
                     <tbody id="complaintTable">
                         <tr>
                             <td colspan="4" class="empty-message">
-                                No demo reports submitted yet.
-                                Use the form above to add a sample report.
+                                No reports yet. Use the form above to create one.
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            <p class="notice">
-                These sample entries are stored only in this browser session.
-                They are not official police complaints.
-            </p>
+            <p class="notice">Reports are saved in the local application database. They are not sent to a police authority.</p>
+        </section>
+
+        <section class="panel complaints-panel" aria-labelledby="notificationHeading">
+            <h2 id="notificationHeading">Notifications</h2>
+            <ul id="notificationList" class="empty-message"><li>Loading notifications…</li></ul>
         </section>
 
         <!-- Safety Information -->
@@ -507,101 +507,110 @@
             <h2>Important Safety Information</h2>
 
             <p>
-                CRIMVEXA AI is a project demonstration and is not an
-                official police reporting service. If you are in immediate
+                CRIMVEXA AI is not an official police reporting service. If you are in immediate
                 danger in India, call <strong>112</strong> for emergency
-                assistance. Do not delay contacting emergency services
-                to use this demo.
+                assistance. Do not delay contacting emergency services.
             </p>
         </section>
 
     </main>
 
     <footer>
-        <p>© 2026 CRIMVEXA AI | AI-Assisted Crime Reporting</p>
+        <p>© 2026 CRIMVEXA AI | AI-assisted reporting support</p>
 
         <p>
             <a href="index.html">Home</a>
-            <a href="login.html">Login</a>
-            <a href="register.html">Register</a>
+            <a href="officer-dashboard.html">Investigation staff</a>
         </p>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="api-client.js"></script>
     <script>
-        const form = document.getElementById("crimeReportForm");
-        const message = document.getElementById("reportMessage");
-        const table = document.getElementById("complaintTable");
+        (async function () {
+            const form = document.getElementById("crimeReportForm");
+            const message = document.getElementById("reportMessage");
+            const table = document.getElementById("complaintTable");
+            const user = await CrimvexaAPI.requireUser("citizen");
+            if (!user) return;
+            const stats = await CrimvexaAPI.request("/dashboard/stats");
+            document.getElementById("signOut").addEventListener("click", event => {
+                event.preventDefault();
+                CrimvexaAPI.logout();
+            });
 
-        function loadReports() {
-            return window.Crimvexa.loadData().cases;
-        }
-
-        function updateDashboard() {
-            const reports = loadReports();
-            document.getElementById("totalReports").textContent = reports.length;
-            document.getElementById("pendingReports").textContent = reports.filter(r => r.status === "SUBMITTED" || r.status === "UNDER_REVIEW").length;
-            document.getElementById("reviewedReports").textContent = reports.filter(r => r.status === "RESOLVED" || r.status === "CLOSED").length;
-
-            if (reports.length === 0) {
-                table.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="empty-message">
-                            No demo reports submitted yet.
-                        </td>
-                    </tr>
-                `;
-                return;
+            document.getElementById("totalReports").textContent = stats.total;
+            document.getElementById("pendingReports").textContent =
+                (stats.by_status.New || 0) + (stats.by_status["Under Review"] || 0);
+            document.getElementById("reviewedReports").textContent = stats.by_status.Resolved || 0;
+            const { complaints } = await CrimvexaAPI.request("/complaints?limit=100");
+            table.replaceChildren();
+            if (!complaints.length) {
+                const row = table.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 4;
+                cell.className = "empty-message";
+                cell.textContent = "No reports yet. Use the form above to create one.";
             }
-
-            table.innerHTML = reports.map((report) => `
-                <tr>
-                    <td>${report.id}</td>
-                    <td>${report.incidentType || report.category || 'Unknown'}</td>
-                    <td>${report.incidentDate || new Date(report.createdAt).toISOString().slice(0, 10)}</td>
-                    <td><span class="status">${report.status}</span></td>
-                </tr>
-            `).join('');
-        }
-
-        form.addEventListener("submit", function(event) {
-            event.preventDefault();
-
-            const incidentDate = document.getElementById("incidentDate").value;
-            const today = new Date();
-            today.setHours(23, 59, 59, 999);
-
-            if (incidentDate && new Date(incidentDate + "T00:00:00") > today) {
-                message.textContent = "Please select today or an earlier incident date.";
-                return;
+            complaints.forEach(report => {
+                const row = table.insertRow();
+                const id = row.insertCell();
+                const link = document.createElement("a");
+                link.href = `receipt.html?caseId=${encodeURIComponent(report.complaint_id)}`;
+                link.textContent = report.complaint_id;
+                id.append(link);
+                row.insertCell().textContent = report.reported_category || report.category || "Other";
+                row.insertCell().textContent = report.incident_time || "—";
+                row.insertCell().textContent = report.status;
+            });
+            const notificationResult = await CrimvexaAPI.request("/notifications");
+            const notifications = document.getElementById("notificationList");
+            notifications.replaceChildren();
+            if (!notificationResult.notifications.length) {
+                const empty = document.createElement("li");
+                empty.textContent = "No notifications yet.";
+                notifications.append(empty);
             }
+            notificationResult.notifications.forEach(item => {
+                const row = document.createElement("li");
+                row.textContent = `${item.message} ${CrimvexaAPI.formatDate(item.created_at)}`;
+                if (!item.read_at) row.style.fontWeight = "700";
+                notifications.append(row);
+            });
 
-            const description = document.getElementById("description").value.trim();
-            const incidentType = document.getElementById("crimeType").value;
-            const location = document.getElementById("incidentLocation").value.trim();
-            const report = {
-                id: window.Crimvexa.generateCaseId(),
-                reporterName: "Citizen Demo User",
-                email: "citizen@example.com",
-                incidentType,
-                incidentDate,
-                location,
-                description,
-                category: window.Crimvexa.inferCategory(description),
-                status: "SUBMITTED",
-                analysis: window.Crimvexa.buildAnalysis(description, location, incidentType).priority,
-                caseLinks: window.Crimvexa.buildAnalysis(description, location, incidentType).caseLinks,
-                createdAt: new Date().toISOString(),
-                statusHistory: [{ status: "SUBMITTED", timestamp: new Date().toISOString(), actor: "Citizen", note: "Complaint submitted." }]
-            };
-
-            window.Crimvexa.addCase(report);
-            updateDashboard();
-            message.textContent = "Demo report added to this page. It has NOT been sent to the police.";
-            form.reset();
+            form.addEventListener("submit", async event => {
+                event.preventDefault();
+                const button = form.querySelector("button[type=submit]");
+                button.disabled = true;
+                message.textContent = "Saving report…";
+                try {
+                    const created = await CrimvexaAPI.request("/complaints", {
+                        method: "POST",
+                        body: {
+                            title: `${document.getElementById("crimeType").value} report`,
+                            reported_category: document.getElementById("crimeType").value,
+                            incident_time: document.getElementById("incidentDate").value,
+                            location: document.getElementById("incidentLocation").value.trim(),
+                            description: document.getElementById("description").value.trim(),
+                            reporter_name: user.full_name,
+                            reporter_email: user.email
+                        }
+                    });
+                    const file = document.getElementById("evidence").files[0];
+                    if (file) {
+                        const body = new FormData();
+                        body.append("files", file);
+                        await CrimvexaAPI.request(`/complaints/${encodeURIComponent(created.complaint_id)}/evidence`, { method: "POST", body });
+                    }
+                    window.location.href = `receipt.html?caseId=${encodeURIComponent(created.complaint_id)}`;
+                } catch (error) {
+                    message.textContent = error.message;
+                    button.disabled = false;
+                }
+            });
+        })().catch(error => {
+            const message = document.getElementById("reportMessage");
+            if (message) message.textContent = error.message;
         });
-
-        updateDashboard();
     </script>
 
 </body>

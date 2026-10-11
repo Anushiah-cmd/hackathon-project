@@ -1,7 +1,6 @@
 """
-CRIMVEXA WITNESS — AI-style Analysis Engine
-Rule-based classifier and missing-field detector.
-PROTOTYPE: Not a real AI model. Not an official triage system.
+CRIMVEXA WITNESS — Baseline Text Analysis
+Rule-based category/priority suggestions and missing-field detection.
 """
 
 import re
@@ -47,10 +46,12 @@ LOW_PRIORITY_KEYWORDS = [
 def _text(complaint: dict) -> str:
     """Combine all text fields into one lowercase string for matching."""
     parts = [
+        complaint.get("title") or "",
         complaint.get("description") or "",
         complaint.get("location") or "",
         complaint.get("item_details") or "",
         complaint.get("escape_direction") or "",
+        complaint.get("reported_category") or "",
     ]
     return " ".join(parts).lower()
 

@@ -131,7 +131,7 @@
             <h1>Create Account</h1>
 
             <p class="register-description">
-                Join CRIMVEXA AI to access the crime reporting platform.
+                Create an account to submit and track your reports.
             </p>
 
             <form class="register-form" id="registerForm">
@@ -170,8 +170,8 @@
                 <select id="role" name="role" required>
                     <option value="">Select account type</option>
                     <option value="citizen">Citizen</option>
-                    <option value="officer">Police Officer (Demo)</option>
                 </select>
+                <p class="register-message">Investigation staff accounts must be provisioned by an administrator.</p>
 
                 <label for="password">Password</label>
                 <input
@@ -216,26 +216,38 @@
         <p>© 2026 CRIMVEXA AI | AI-Assisted Crime Reporting</p>
     </footer>
 
-    <!-- Frontend demo validation only -->
+    <script src="api-client.js"></script>
     <script>
         const registerForm = document.getElementById("registerForm");
         const registerMessage = document.getElementById("registerMessage");
-
-        registerForm.addEventListener("submit", function(event) {
+        registerForm.addEventListener("submit", async function(event) {
             event.preventDefault();
-
             const password = document.getElementById("password").value;
-            const confirmPassword =
-                document.getElementById("confirmPassword").value;
-
-            if (password !== confirmPassword) {
-                registerMessage.textContent =
-                    "Passwords do not match. Please try again.";
+            if (password !== document.getElementById("confirmPassword").value) {
+                registerMessage.textContent = "Passwords do not match.";
                 return;
             }
-
-            registerMessage.textContent =
-                "Registration form validated. Connect the backend to create your account.";
+            const button = registerForm.querySelector("button[type=submit]");
+            button.disabled = true;
+            registerMessage.textContent = "Creating your account…";
+            try {
+                const result = await CrimvexaAPI.request("/auth/register", {
+                    method: "POST",
+                    body: {
+                        full_name: document.getElementById("fullName").value.trim(),
+                        email: document.getElementById("email").value.trim(),
+                        phone: document.getElementById("phone").value.trim(),
+                        password,
+                        role: "citizen"
+                    }
+                });
+                CrimvexaAPI.saveSession(result);
+                registerMessage.textContent = "Account created. Opening your dashboard…";
+                window.location.href = "citizen-dashboard.html";
+            } catch (error) {
+                registerMessage.textContent = error.message;
+                button.disabled = false;
+            }
         });
     </script>
 

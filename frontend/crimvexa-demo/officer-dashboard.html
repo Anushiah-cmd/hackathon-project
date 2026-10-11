@@ -162,13 +162,13 @@
   <main class="container">
     <div class="topbar">
       <h1>Officer dashboard</h1>
-      <a href="mock-portal.html" class="btn btn-outline">Open mock portal</a>
+      <button type="button" class="btn btn-outline" id="signOut">Sign out</button>
     </div>
 
     <section class="stats">
       <div class="stat"><span class="label">New</span><span class="value" id="countNew">0</span></div>
       <div class="stat"><span class="label">Under review</span><span class="value" id="countReview">0</span></div>
-      <div class="stat"><span class="label">Needs info</span><span class="value" id="countInfo">0</span></div>
+      <div class="stat"><span class="label">Needs details</span><span class="value" id="countInfo">0</span></div>
       <div class="stat"><span class="label">Resolved</span><span class="value" id="countResolved">0</span></div>
     </section>
 
@@ -178,11 +178,9 @@
           <label for="statusFilter" class="key">Filter</label>
           <select id="statusFilter">
             <option value="ALL">All statuses</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="UNDER_REVIEW">Under review</option>
-            <option value="NEEDS_INFORMATION">Needs information</option>
-            <option value="RESOLVED">Resolved</option>
-            <option value="CLOSED">Closed</option>
+            <option value="New">New</option>
+            <option value="Under Review">Under review</option>
+            <option value="Resolved">Resolved</option>
           </select>
         </div>
         <div id="caseList" class="case-list"></div>
@@ -195,104 +193,156 @@
     </div>
   </main>
 
-  <script src="app.js"></script>
+  <script src="api-client.js"></script>
   <script>
-    (function () {
-      const filter = document.getElementById('statusFilter');
-      const caseList = document.getElementById('caseList');
-      const detailPanel = document.getElementById('detailPanel');
-      let selectedCaseId = null;
+    (async function () {
+      const filter = document.getElementById("statusFilter");
+      const caseList = document.getElementById("caseList");
+      const detailPanel = document.getElementById("detailPanel");
+      let cases = [];
+      let selected = null;
+      const staff = await CrimvexaAPI.requireUser("officer");
+      if (!staff) return;
+      document.getElementById("signOut").addEventListener("click", CrimvexaAPI.logout);
 
-      function getCases() {
-        return window.Crimvexa.loadData().cases.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      }
-
-      function renderSummary() {
-        const cases = getCases();
-        document.getElementById('countNew').textContent = cases.filter((c) => c.status === 'SUBMITTED').length;
-        document.getElementById('countReview').textContent = cases.filter((c) => c.status === 'UNDER_REVIEW').length;
-        document.getElementById('countInfo').textContent = cases.filter((c) => c.status === 'NEEDS_INFORMATION').length;
-        document.getElementById('countResolved').textContent = cases.filter((c) => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
-      }
-
-      function renderDetail(caseData) {
-        if (!caseData) {
-          detailPanel.innerHTML = '<h2>Select a case</h2><p>No complaint selected yet.</p>';
-          return;
+      async function load() {
+        const stats = await CrimvexaAPI.request("/dashboard/stats");
+        document.getElementById("countNew").textContent = stats.by_status.New || 0;
+        document.getElementById("countReview").textContent = stats.by_status["Under Review"] || 0;
+        document.getElementById("countResolved").textContent = stats.by_status.Resolved || 0;
+        const result = await CrimvexaAPI.request("/complaints?limit=100");
+        cases = result.complaints;
+        document.getElementById("countInfo").textContent =
+          cases.filter(item => item.missing_fields && item.missing_fields.length).length;
+        renderList();
+        if (selected) {
+          const updated = cases.find(item => item.complaint_id === selected);
+          if (updated) renderDetail(updated);
+        } else if (cases.length) {
+          selected = cases[0].complaint_id;
+          renderDetail(cases[0]);
+        } else {
+          detailPanel.textContent = "No complaints have been submitted.";
         }
-
-        const links = (caseData.caseLinks || []).filter((link) => link.id !== 'NO-LINKS').map((link) => `<li>${link.id} • ${link.reason}</li>`).join('') || '<li>No case links available.</li>';
-
-        detailPanel.innerHTML = `
-          <h2>${caseData.id}</h2>
-          <p><span class="key">Reporter:</span> ${caseData.reporterName}</p>
-          <p><span class="key">Type:</span> ${caseData.incidentType}</p>
-          <p><span class="key">Location:</span> ${caseData.location}</p>
-          <p><span class="key">Priority:</span> ${caseData.analysis.level} (${caseData.analysis.score})</p>
-          <p><span class="key">Description:</span> ${caseData.description}</p>
-          <p><span class="key">Reasoning:</span> ${caseData.analysis.reasons.join(', ')}</p>
-          <h3>Possible links</h3>
-          <ul class="mini-list">${links}</ul>
-          <div class="actions">
-            <button class="btn btn-primary" data-action="UNDER_REVIEW">Mark under review</button>
-            <button class="btn btn-warn" data-action="NEEDS_INFORMATION">Request info</button>
-            <button class="btn btn-success" data-action="RESOLVED">Resolve</button>
-          </div>
-        `;
-
-        detailPanel.querySelectorAll('[data-action]').forEach((button) => {
-          button.addEventListener('click', () => {
-            const action = button.getAttribute('data-action');
-            window.Crimvexa.updateStatus(caseData.id, action, 'Officer', `Officer marked the case as ${action.toLowerCase().replace(/_/g, ' ')}.`);
-            render();
-          });
-        });
       }
 
       function renderList() {
-        const cases = getCases();
-        const currentFilter = filter.value;
-        const filtered = currentFilter === 'ALL' ? cases : cases.filter((item) => item.status === currentFilter);
-
-        if (!filtered.length) {
-          caseList.innerHTML = '<p>No cases match the selected filter.</p>';
-          return;
-        }
-
-        caseList.innerHTML = filtered.map((item) => `
-          <div class="case-card ${selectedCaseId === item.id ? 'active' : ''}" data-id="${item.id}">
-            <div class="case-header">
-              <div class="case-id">${item.id}</div>
-              <span class="tag ${item.analysis.level.toLowerCase()}">${item.analysis.level}</span>
-            </div>
-            <div class="meta">${item.incidentType} • ${window.Crimvexa.formatDate(item.createdAt)}</div>
-            <div class="meta"><strong>Status:</strong> ${item.status}</div>
-            <div class="meta">${item.location}</div>
-          </div>
-        `).join('');
-
-        caseList.querySelectorAll('.case-card').forEach((card) => {
-          card.addEventListener('click', () => {
-            selectedCaseId = card.getAttribute('data-id');
-            renderList();
-            renderDetail(window.Crimvexa.getCaseById(selectedCaseId));
-          });
+        caseList.replaceChildren();
+        const filtered = cases.filter(item => filter.value === "ALL" || item.status === filter.value);
+        if (!filtered.length) { caseList.textContent = "No cases match the selected filter."; return; }
+        filtered.forEach(item => {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = `case-card${selected === item.complaint_id ? " active" : ""}`;
+          const title = document.createElement("strong");
+          title.textContent = `${item.complaint_id} · ${item.priority || "Unrated"}`;
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.textContent = `${item.reported_category || item.category} · ${item.status} · ${CrimvexaAPI.formatDate(item.created_at)} · ${item.location || "Location not supplied"}`;
+          card.append(title, meta);
+          card.addEventListener("click", () => { selected = item.complaint_id; renderList(); renderDetail(item); });
+          caseList.append(card);
         });
       }
 
-      function render() {
-        renderSummary();
-        renderList();
-        if (!selectedCaseId) {
-          const firstCase = getCases()[0];
-          selectedCaseId = firstCase ? firstCase.id : null;
-        }
-        renderDetail(window.Crimvexa.getCaseById(selectedCaseId));
+      async function renderDetail(item) {
+        item = await CrimvexaAPI.request(`/complaints/${encodeURIComponent(item.complaint_id)}`);
+        detailPanel.replaceChildren();
+        const heading = document.createElement("h2");
+        heading.textContent = item.title || item.complaint_id;
+        const text = document.createElement("p");
+        text.textContent = `${item.complaint_id} · ${item.reporter_name || "Reporter"} · ${item.status} · ${item.priority || "Unrated"} priority\n\n${item.description}`;
+        text.style.whiteSpace = "pre-line";
+        const location = document.createElement("p");
+        location.textContent = `Location: ${item.location || "Not provided"}`;
+        const category = document.createElement("p");
+        category.textContent = `Suggested category: ${item.category || "Unclassified"} — ${item.category_reason || "No reasoning available"}`;
+        const evidence = document.createElement("p");
+        evidence.textContent = `Evidence attached: ${(item.evidence || []).length}`;
+        const assignment = document.createElement("p");
+        const currentAssignment = await CrimvexaAPI.request(
+          `/complaints/${encodeURIComponent(item.complaint_id)}/assignment`
+        );
+        assignment.textContent = currentAssignment.assigned_officer
+          ? `Assigned to: ${currentAssignment.assigned_officer.full_name}`
+          : "Unassigned";
+        const assignButton = document.createElement("button");
+        assignButton.type = "button";
+        assignButton.className = "btn btn-outline";
+        assignButton.textContent = "Assign to me";
+        assignButton.addEventListener("click", async () => {
+          try {
+            await CrimvexaAPI.request(`/complaints/${encodeURIComponent(item.complaint_id)}/assignment`, { method: "PUT", body: {} });
+            await load();
+          } catch (error) { assignment.textContent = error.message; }
+        });
+        const noteLabel = document.createElement("label");
+        noteLabel.textContent = "Internal investigation note";
+        const noteInput = document.createElement("textarea");
+        noteInput.maxLength = 4000;
+        noteInput.setAttribute("aria-label", "Internal investigation note");
+        const saveNote = document.createElement("button");
+        saveNote.type = "button";
+        saveNote.className = "btn btn-outline";
+        saveNote.textContent = "Add note";
+        const noteStatus = document.createElement("p");
+        const notesList = document.createElement("ul");
+        const notes = await CrimvexaAPI.request(
+          `/complaints/${encodeURIComponent(item.complaint_id)}/notes`
+        );
+        notes.notes.forEach(entry => {
+          const row = document.createElement("li");
+          row.textContent = `${entry.officer_name} · ${CrimvexaAPI.formatDate(entry.created_at)}: ${entry.note}`;
+          notesList.append(row);
+        });
+        saveNote.addEventListener("click", async () => {
+          saveNote.disabled = true;
+          try {
+            await CrimvexaAPI.request(`/complaints/${encodeURIComponent(item.complaint_id)}/notes`, {
+              method: "POST", body: { note: noteInput.value }
+            });
+            await renderDetail(item);
+          } catch (error) {
+            noteStatus.textContent = error.message;
+            saveNote.disabled = false;
+          }
+        });
+        noteLabel.append(noteInput);
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        [["Under Review", "Mark under review"], ["Resolved", "Resolve"]].forEach(([status, label]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn btn-primary";
+          button.textContent = label;
+          button.disabled = item.status === status;
+          button.addEventListener("click", async () => {
+            button.disabled = true;
+            try {
+              await CrimvexaAPI.request(`/complaints/${encodeURIComponent(item.complaint_id)}/status`, {
+                method: "PATCH", body: { status }
+              });
+              await load();
+            } catch (error) {
+              const notice = document.createElement("p");
+              notice.textContent = error.message;
+              detailPanel.append(notice);
+              button.disabled = false;
+            }
+          });
+          actions.append(button);
+        });
+        detailPanel.append(
+          heading, text, location, category, evidence, assignment, assignButton,
+          noteLabel, saveNote, noteStatus, notesList, actions
+        );
       }
 
-      filter.addEventListener('change', renderList);
-      render();
-    })();
+      filter.addEventListener("change", renderList);
+      await load();
+    })().catch(error => {
+      document.getElementById("caseList").textContent = error.message;
+    });
   </script>
 </body>
 </html>

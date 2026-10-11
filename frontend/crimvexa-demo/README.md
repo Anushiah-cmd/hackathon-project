@@ -1,20 +1,14 @@
-# CRIMVEXA AI static demo
+# CRIMVEXA AI web application
 
-This folder contains a standalone browser prototype of the CRIMVEXA reporting
-workflow. It uses browser `localStorage` for demo cases and does not connect to
-a backend, create official reports, or contact emergency services.
+This browser application uses the Flask API and SQLite database described in
+the repository's [main README](../../README.md). It includes citizen
+registration/sign-in, complaint intake and tracking, evidence upload, and
+staff case review.
 
-## Run locally
+Start the API from `backend` with `python app.py`, then serve this folder with
+`python -m http.server 8000` and open <http://127.0.0.1:8000/index.html>.
 
-From this folder, start a local server:
-
-```sh
-python -m http.server 8000
-```
-
-Then open <http://localhost:8000/index.html> in a browser. The prototype includes
-a complaint form, citizen dashboard, receipt, officer dashboard, mock filing
-portal, and demo login and registration pages.
-
-Do not enter real personal information or evidence. In an emergency in India,
-call 112.
+Category and priority are rule-based suggestions for human review. This local
+application does not submit reports to a police authority or provide emergency
+response, OCR, identity verification, or external AI services. Use synthetic
+information only; call 112 in India in an emergency.

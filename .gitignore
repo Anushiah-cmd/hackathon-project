@@ -7,8 +7,12 @@ __pycache__/
 
 # SQLite database (contains test data — do not commit populated DB)
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
+backend/uploads/
 
 # Virtual environments
 venv/

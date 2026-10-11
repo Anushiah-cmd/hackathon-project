@@ -113,7 +113,7 @@ input[type=file]{background:#f8fafc}
     <span class="tag">Report a crime</span>
     <h1>Tell us what happened</h1>
     <p>Type your statement, or press Speak and say it in your own language. The checklist on the right shows which details are still missing.</p>
-    <p class="sos"><strong>In danger right now?</strong> Call <strong>112</strong> first. This page is a project demo, not an official police service.</p>
+    <p class="sos"><strong>In danger right now?</strong> Call <strong>112</strong> first. This application records cases locally and does not contact a police authority.</p>
   </section>
 
   <div class="layout">
@@ -130,7 +130,7 @@ input[type=file]{background:#f8fafc}
           </div>
           <div>
             <label for="email">Email or phone *</label>
-            <input id="email" autocomplete="username" required>
+            <input id="email" type="email" autocomplete="email" required readonly>
           </div>
           <div>
             <label for="category">Incident category *</label>
@@ -165,18 +165,18 @@ input[type=file]{background:#f8fafc}
           </div>
           <div class="full">
             <label for="evidence">Photo or document (optional)</label>
-            <input id="evidence" type="file" accept="image/jpeg,image/png,application/pdf">
-            <p class="note">JPG, PNG or PDF, up to 5 MB. Demo only: the file stays on your device and is not uploaded.</p>
+            <input id="evidence" type="file" accept="image/jpeg,image/png,application/pdf,text/plain,audio/mpeg,audio/wav,video/mp4,video/webm" multiple>
+            <p class="note">Supported: JPG, PNG, PDF, TXT, MP3, WAV, MP4 and WebM. Up to 5 MB per file.</p>
             <div id="preview"></div>
           </div>
         </div>
 
         <label class="consent">
           <input type="checkbox" id="agree" required>
-          <span>I understand this is a demonstration. Submitting it will not notify the police or create an official complaint.</span>
+          <span>I understand this saves a case in this application but does not notify the police or create an official police complaint.</span>
         </label>
 
-        <button type="submit" class="btn btn-primary submit">Submit demo complaint</button>
+        <button type="submit" class="btn btn-primary submit">Submit complaint</button>
         <div id="msg" class="msg" role="status" aria-live="polite"></div>
       </form>
     </section>
@@ -203,14 +203,19 @@ input[type=file]{background:#f8fafc}
 
 <footer class="footer">
   <div class="fl"><a href="index.html">Home</a><a href="citizen-dashboard.html">Dashboard</a><a href="login.html">Login</a><a href="register.html">Register</a></div>
-  <p>&copy; 2026 CRIMVEXA AI. Student project demonstration.</p>
+  <p>&copy; 2026 CRIMVEXA AI. Local case-management application.</p>
 </footer>
 
-<script src="app.js"></script>
+<script src="api-client.js"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
   const form=$('complaintForm'),story=$('story'),msg=$('msg');
+  let currentUser=null;
+  CrimvexaAPI.requireUser('citizen').then(user=>{
+    currentUser=user;
+    if(user){$('name').value=user.full_name;$('email').value=user.email;}
+  }).catch(error=>{msg.className='msg bad';msg.textContent=error.message;});
 
   const pad=n=>String(n).padStart(2,'0'),d=new Date();
   $('when').max=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -238,53 +243,53 @@ input[type=file]{background:#f8fafc}
 
   $('evidence').onchange=function(){
     const box=$('preview');box.textContent='';const f=this.files[0];if(!f)return;
-    if(f.size>5*1024*1024){this.value='';box.textContent='That file is over 5 MB. Choose a smaller one.';return}
+    if(Array.from(this.files).some(file=>file.size>5*1024*1024)){this.value='';box.textContent='Each file must be 5 MB or smaller.';return}
     if(f.type.startsWith('image/')){const img=new Image();img.alt='Selected evidence';img.src=URL.createObjectURL(f);box.append(img)}
-    else if(f.type==='application/pdf'){const note=document.createElement('p');note.textContent='Selected file: '+f.name;box.append(note)}
+    Array.from(this.files).forEach(file=>{const note=document.createElement('p');note.textContent='Selected: '+file.name;box.append(note)});
   };
 
-  form.addEventListener('submit',function(e){
+  form.addEventListener('submit',async function(e){
     e.preventDefault();
     const requiredFields=['name','email','category','when','place','story'];
     const missing=requiredFields.filter(id=>!$(id).value.trim());
     if(missing.length || !$('agree').checked){
       msg.className='msg bad';
-      msg.textContent='Please complete all required fields and confirm the demo notice before submitting.';
+      msg.textContent='Please complete all required fields and confirm the notice before submitting.';
       return;
     }
-
-    const caseId = window.Crimvexa.generateCaseId();
-    const analysis = window.Crimvexa.buildAnalysis($('story').value, $('place').value, $('category').value);
-    const report = {
-      id: caseId,
-      reporterName: $('name').value.trim(),
-      email: $('email').value.trim(),
-      incidentType: $('category').value,
-      incidentDate: $('when').value.slice(0,10),
-      location: $('place').value.trim(),
-      description: $('story').value.trim(),
-      language: $('lang').value,
-      category: analysis.category,
-      status: 'SUBMITTED',
-      analysis: {
-        level: analysis.priority.level,
-        score: analysis.priority.score,
-        reasons: analysis.priority.reasons,
-        missingFields: analysis.missingFields
-      },
-      caseLinks: analysis.caseLinks,
-      evidence: $('evidence').files && $('evidence').files.length ? [{ name: $('evidence').files[0].name, type: $('evidence').files[0].type || 'unknown' }] : [],
-      createdAt: new Date().toISOString(),
-      statusHistory: [{ status: 'SUBMITTED', timestamp: new Date().toISOString(), actor: 'Citizen', note: 'Complaint submitted by citizen.' }]
-    };
-
-    const saved = window.Crimvexa.addCase(report);
-    msg.className='msg ok';
-    msg.innerHTML=`Demo complaint submitted successfully. <a href="receipt.html?caseId=${saved.id}">View receipt</a>`;
-    form.reset();
-    check();
-    setTimeout(() => {
-      window.location.href = `receipt.html?caseId=${saved.id}`;
-    }, 700);
+    const button=form.querySelector('[type=submit]');
+    button.disabled=true;
+    msg.className='msg';
+    msg.textContent='Saving complaint and analyzing details…';
+    try{
+      if(!currentUser) throw new Error('Sign in before submitting a complaint.');
+      const created=await CrimvexaAPI.request('/complaints',{
+        method:'POST',
+        body:{
+          title:`${$('category').value} report`,
+          description:story.value.trim(),
+          location:$('place').value.trim(),
+          incident_time:$('when').value,
+          preferred_language:$('lang').value,
+          reporter_name:$('name').value.trim(),
+          reporter_email:$('email').value.trim(),
+          reported_category:$('category').value
+        }
+      });
+      let evidenceWarning='';
+      if($('evidence').files.length){
+        const files=new FormData();
+        Array.from($('evidence').files).forEach(file=>files.append('files',file));
+        try{await CrimvexaAPI.request(`/complaints/${encodeURIComponent(created.complaint_id)}/evidence`,{method:'POST',body:files});}
+        catch(error){evidenceWarning=` Case saved, but evidence upload failed: ${error.message}`;}
+      }
+      msg.className=evidenceWarning?'msg bad':'msg ok';
+      msg.textContent=`Complaint ${created.complaint_id} saved. Suggested category: ${created.category}; priority: ${created.priority}.${evidenceWarning}`;
+      setTimeout(()=>{window.location.href=`receipt.html?caseId=${encodeURIComponent(created.complaint_id)}`;},evidenceWarning?1800:900);
+    }catch(error){
+      msg.className='msg bad';
+      msg.textContent=error.message;
+      button.disabled=false;
+    }
   });
 })();
