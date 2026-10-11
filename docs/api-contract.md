@@ -1,8 +1,8 @@
 # CRIMVEXA AI — API Contract
 
 > This local application stores records in SQLite and does not submit reports to
-> a police authority. Category/priority suggestions and sample-case matches are
-> rule-based aids, not official decisions. Call 112 in India in an emergency.
+> a police authority. Category/priority suggestions and similarity results are
+> rule-based review aids, not official decisions. Call 112 in India in an emergency.
 
 Base URL (local development): `http://127.0.0.1:5000`
 
@@ -21,7 +21,7 @@ GET /api/health
 {
   "status": "ok",
   "service": "Crimvexa Witness Backend",
-  "note": "Hackathon prototype — fictional/demonstration data only"
+  "note": "Local application API; records are not submitted to a police authority."
 }
 ```
 
@@ -96,7 +96,7 @@ Content-Type: application/json
 The request body must be a JSON object. `description` is required and limited
 to 10,000 characters. Optional text fields must be strings and are length
 limited; invalid JSON shapes, field types, and oversized values return HTTP
-400. Requests larger than 64 KiB return HTTP 413.
+400. Requests larger than 52 MB return HTTP 413.
 
 ---
 
@@ -105,6 +105,12 @@ limited; invalid JSON shapes, field types, and oversized values return HTTP
 ```
 GET /api/complaints
 ```
+
+Supported query filters can be combined: `q`, `status`, `category`, `priority`
+(`High`, `Medium`, or `Low`), `assigned_officer_id`, `created_after`, and
+`created_before` (`YYYY-MM-DD`). `limit` is capped at 100 and `offset` is
+zero-based. Citizen results are always restricted to that citizen's own cases.
+Potential-duplicate details are returned only to officer/admin accounts.
 
 **Response 200**
 ```json
@@ -146,7 +152,10 @@ GET /api/complaints/{complaint_id}
 POST /api/complaints/{complaint_id}/analyze
 ```
 
-Runs (or re-runs) missing-field detection, category/priority classification, and similar-case matching. Saves results to the database.
+Runs (or re-runs) missing-field detection, category/priority classification,
+synthetic-example matching, and potential-duplicate matching. Saves results to
+the database. Potential-duplicate details are included only for officer/admin
+accounts.
 
 **Response 200**
 ```json
@@ -172,7 +181,7 @@ Runs (or re-runs) missing-field detection, category/priority classification, and
   ],
   "similar_cases_note": null,
   "briefing": { "...": "..." },
-  "disclaimer": "⚠️ Automated suggestion only. Requires human officer review."
+  "disclaimer": "Automated suggestion only. Requires human officer review."
 }
 ```
 
@@ -225,6 +234,7 @@ are added to the case history and notify the reporter.
 | `priority_reason` | string | Why this priority was suggested |
 | `missing_fields` | array | List of `{field, question}` objects |
 | `similar_cases` | array | Synthetic similar cases |
+| `potential_duplicates` | array | Staff-only text-similar case candidates; review suggestions, not automatic merges |
 | `briefing` | object | Officer briefing summary |
 | `created_at` | string | ISO 8601 timestamp |
 | `updated_at` | string | ISO 8601 timestamp |
@@ -300,3 +310,35 @@ directory. Uploads are not malware-scanned or OCR-processed.
 Assignment and internal-note endpoints require an officer/admin token. Status
 history is created at submission and on each status change. Internal notes
 remain staff-only.
+
+---
+
+## Implemented algorithm inventory
+
+| Algorithm | Implementation and input | Output and use | Limits |
+|---|---|---|---|
+| Category classification | `backend/analysis.py::classify`; whole-word/phrase keyword rules over title, narrative, location, item/suspect details, and reported category. The category with the most matched rules wins; ties follow the declared rule order. | Suggested category and matched-keyword explanation, persisted on complaint creation, edit, and re-analysis. | Deterministic baseline, not a trained classifier. No confidence or accuracy score is produced. |
+| Priority assessment | `backend/analysis.py::classify`; explicit high/low keyword signals, then Medium fallback. Whole-word matching avoids substring hits; nearby explicit negation suppresses a match. | Suggested High/Medium/Low and reason, displayed as an aid for human review. | Rules are not clinically or operationally validated and are not emergency triage. Call 112 in India for immediate danger. |
+| Missing-detail prompts | `backend/analysis.py::detect_missing`; narrative length and presence of location/time, plus property/physical-crime keyword conditions. | Questions stored with the case and shown to the user/officer. | Heuristics cannot determine whether a provided detail is accurate. |
+| Synthetic-example matching | `backend/analysis.py::find_similar`; shared explicit keywords compared against the seven clearly labeled fictional examples. | Up to three sample matches in the complaint response. | These are not real cases and are not duplicate detection. |
+| Potential duplicate candidates | `backend/analysis.py::find_potential_duplicates`; unigram TF-IDF with cosine similarity over title, narrative, location, item details, and reported category. Searches up to the 1,000 most recently created existing complaints; configurable threshold defaults to 0.35 and returns the top three. | Candidate ID, category, status, date, short narrative, and 0–1 similarity are persisted and exposed only to officer/admin APIs and the officer dashboard. | Lexical similarity is not proof of duplication. Results never reject, delete, or merge cases. Threshold is configurable, not an evaluated model setting. |
+| Evidence integrity metadata | `backend/routes/complaints.py`; extension/MIME and size checks, limited PDF/PNG/JPEG signature checks, and SHA-256 over uploaded bytes. | Stored file, byte size, MIME type, and digest are associated with the complaint. | A hash only helps detect later byte changes; it does not establish authenticity. No OCR, image recognition, face detection, audio/video analysis, or malware scanning runs. |
+| Password/token cryptography | `backend/auth.py`; PBKDF2-HMAC-SHA256 with per-password salt and HMAC-SHA256 signed expiring bearer tokens. | Hashed passwords and verifiable signed sessions. | Security primitives, not complaint classification/analysis. |
+
+### Processing and persistence
+
+Complaint intake validates input, then runs classification, priority rules,
+missing-detail detection, synthetic-example matching, and database-backed
+potential-duplicate matching before persisting the case and all analysis
+outputs. Editing an eligible `New` case and explicit re-analysis recompute and
+replace those outputs; they do not append duplicate analysis rows. Potential
+matches are for authorized staff review only. The original complaint is
+preserved regardless of the similarity score.
+
+There is no Random Forest, SVM, Naive Bayes, transformer, decision-tree model,
+OCR package, or computer-vision dependency in this repository. Training data
+and validated evaluation metrics are not available, so the application makes
+no model accuracy or confidence claims.
+
+Configure the potential-duplicate threshold with the
+`CRIMVEXA_SIMILARITY_THRESHOLD` environment variable (numeric range `0`–`1`).

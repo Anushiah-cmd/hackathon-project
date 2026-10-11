@@ -80,6 +80,8 @@ a{color:inherit;text-decoration:none}
 .text-button{color:var(--red);font:inherit;font-weight:700}
 .text-button:hover{text-decoration:underline}
 .tiny{margin-top:16px;font-size:12px;color:var(--soft);line-height:1.6}
+.access-note{margin:0 0 20px;padding:12px 14px;border:1px solid #dbeafe;border-radius:10px;background:#eff6ff;color:#334155;font-size:13px;line-height:1.55}
+.auth-form button:disabled{opacity:.7;cursor:wait}
 
 .verify-box{margin:4px 0 20px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
 .verify-box summary{cursor:pointer;padding:12px 14px;font-size:13px;font-weight:700;color:#334155;list-style:none;display:flex;justify-content:space-between;align-items:center}
@@ -146,15 +148,19 @@ a{color:inherit;text-decoration:none}
 }
 
 @media(max-width:860px){
-  .nav-links{display:none}
-  .auth-wrap{grid-template-columns:1fr}
-  .auth-side{padding:50px 6% 80px}
+  .auth-wrap{grid-template-columns:minmax(0,1fr)}
+  .auth-side{min-height:300px;padding:44px 6% 76px}
   .auth-art{font-size:100px}
+  .auth-form{animation:none}
+  .nav-links{order:3;width:100%;justify-content:center;gap:18px;flex-wrap:wrap}
+  .navbar{gap:12px}
 }
 @media(max-width:480px){
-  .login-options{flex-direction:column;align-items:flex-start}
-  .auth-form{padding:24px}
-  .row{flex-direction:column;align-items:stretch}
+  .nav-links{gap:10px 16px}
+  .nav-links a{font-size:13px}
+  .nav-buttons .btn{padding:9px 13px}
+  .auth-form{width:auto;min-width:0;justify-self:stretch;margin:24px 16px;padding:24px}
+  .auth-side h2{font-size:2rem}
 }
 </style>
 </head>
@@ -166,12 +172,11 @@ a{color:inherit;text-decoration:none}
     <span class="logo-icon">C</span>
     <span>CRIMVEXA <span class="ai-text">AI</span></span>
   </a>
-  <nav class="nav-links">
-     <a href="index.html">Home</a>
-     <a href="login.html">Home</a>
-            <a href="complaint.html">Features</a>
-            <a href="citizen-dashboard.html">How It Works</a>
-            <a href="register.html">Register</a>
+  <nav class="nav-links" aria-label="Main navigation">
+    <a href="index.html">Home</a>
+    <a href="complaint.html">Report a crime</a>
+    <a href="citizen-dashboard.html">Citizen dashboard</a>
+    <a href="login.html" aria-current="page">Sign in</a>
   </nav>
   <div class="nav-buttons">
     <a href="register.html" class="btn btn-primary">Register</a>
@@ -183,7 +188,7 @@ a{color:inherit;text-decoration:none}
   <section class="auth-side">
     <span class="eyebrow">WELCOME TO CRIMVEXA AI</span>
     <h2>Your Safety.<br>Your Voice.<br>Your Account.</h2>
-    <p>Sign in to access your citizen dashboard, submit complaints, upload evidence, and track report updates.</p>
+    <p>One secure sign-in for citizens, investigation staff, and administrators.</p>
     <div class="auth-art">✦</div>
     <a href="index.html" class="back-home">&larr; Back to Home</a>
   </section>
@@ -192,19 +197,20 @@ a{color:inherit;text-decoration:none}
 
     <div class="eyebrow">ACCOUNT ACCESS</div>
     <h2>Welcome Back</h2>
-    <p class="muted">Enter your details to continue to CRIMVEXA AI.</p>
+    <p class="muted">Enter your account email and password to continue.</p>
+    <p class="access-note">Staff and administrator access is enabled for accounts provisioned by an administrator. Your dashboard opens according to your account role.</p>
 
-    <form id="loginForm" novalidate>
+    <form id="loginForm">
 
-      <label for="email">Email Address
-        <input type="email" id="email" name="email" placeholder="Enter your email address" autocomplete="email" required>
+      <label for="email">Email address
+        <input type="email" id="email" name="email" placeholder="name@example.com" autocomplete="username" aria-describedby="loginHint" required>
       </label>
 
       <label for="password">Password
-        <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" minlength="8" required>
+        <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
       </label>
 
-      <p class="tiny">Passwords are checked by the application server. CRIMVEXA does not perform identity-document verification.</p>
+      <p class="tiny" id="loginHint">Passwords are checked by the application server. Identity documents are not verified.</p>
 
       <button type="submit" class="btn btn-primary full">Login to Account &rarr;</button>
     </form>

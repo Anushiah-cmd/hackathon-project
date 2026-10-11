@@ -71,6 +71,7 @@ def init_db():
                 priority_reason TEXT,
                 missing_fields  TEXT,   -- JSON array stored as text
                 similar_cases   TEXT,   -- JSON array stored as text
+                potential_duplicates TEXT DEFAULT '[]',
                 briefing        TEXT,   -- JSON object stored as text
                 reporter_user_id INTEGER REFERENCES users(user_id),
                 assigned_officer_id INTEGER REFERENCES users(user_id),
@@ -137,9 +138,18 @@ def init_db():
             "reporter_name": "ALTER TABLE complaints ADD COLUMN reporter_name TEXT",
             "reporter_email": "ALTER TABLE complaints ADD COLUMN reporter_email TEXT",
             "assigned_officer_id": "ALTER TABLE complaints ADD COLUMN assigned_officer_id INTEGER REFERENCES users(user_id)",
+            "potential_duplicates": "ALTER TABLE complaints ADD COLUMN potential_duplicates TEXT DEFAULT '[]'",
         }
         for column, statement in migrations.items():
             if column not in columns:
                 conn.execute(statement)
+        conn.execute(
+            """CREATE INDEX IF NOT EXISTS idx_complaints_category_priority
+               ON complaints(category, priority)"""
+        )
+        conn.execute(
+            """CREATE INDEX IF NOT EXISTS idx_complaints_assigned_officer
+               ON complaints(assigned_officer_id)"""
+        )
 
     print("[DB] Tables ready ->", _database_path())

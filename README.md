@@ -44,7 +44,8 @@ Open <http://127.0.0.1:8000/index.html>. API health is available at
    returned bearer token. Citizen accounts can access only their own cases.
 2. Submit an incident with its date/time, location, category, and narrative.
 3. Review the stored suggested category, priority, missing details, and sample
-   keyword matches.
+   keyword matches. Investigation staff can also review text-similar existing
+   cases; those matches are suggestions only and do not merge or reject reports.
 4. Upload supported evidence (JPG, PNG, PDF, TXT, MP3, WAV, MP4, or WebM; up to
    5 MB per file) and view it from the complaint details page.
 5. Edit complaint details while the case is still `New`, and track status
@@ -71,8 +72,13 @@ network.
 - Set `CRIMVEXA_AUTH_SECRET` to a long random value to keep bearer tokens valid
   across API restarts. Without it, the local server generates a temporary key
   at startup.
+- Set `CRIMVEXA_SIMILARITY_THRESHOLD` to a number from `0` to `1` to tune the
+  staff-only potential-duplicate review threshold (default: `0.35`).
 - Use synthetic information only. This local implementation is not connected
   to a police, emergency, identity-verification, OCR, or external AI service.
+- Category and priority outputs are explainable keyword baselines, not trained
+  or validated predictive models. Evidence files receive type/size checks and
+  SHA-256 metadata only; a file hash does not prove evidence authenticity.
 
 ## Tests
 

@@ -1,5 +1,6 @@
 """CRIMVEXA local case-management API application."""
 
+import math
 import os
 import secrets
 
@@ -19,9 +20,21 @@ def create_app(config=None):
         MAX_CONTENT_LENGTH=52 * 1024 * 1024,
         UPLOAD_FOLDER=os.path.join(os.path.dirname(__file__), "uploads"),
         AUTH_SECRET=os.environ.get("CRIMVEXA_AUTH_SECRET") or secrets.token_bytes(32),
+        POTENTIAL_DUPLICATE_THRESHOLD=os.environ.get(
+            "CRIMVEXA_SIMILARITY_THRESHOLD", "0.35"
+        ),
     )
     if config:
         app.config.update(config)
+    try:
+        similarity_threshold = float(app.config["POTENTIAL_DUPLICATE_THRESHOLD"])
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "POTENTIAL_DUPLICATE_THRESHOLD must be a number from 0 to 1."
+        ) from error
+    if not math.isfinite(similarity_threshold) or not 0 <= similarity_threshold <= 1:
+        raise ValueError("POTENTIAL_DUPLICATE_THRESHOLD must be a number from 0 to 1.")
+    app.config["POTENTIAL_DUPLICATE_THRESHOLD"] = similarity_threshold
     if isinstance(app.config["AUTH_SECRET"], str):
         app.config["AUTH_SECRET"] = app.config["AUTH_SECRET"].encode("utf-8")
 

@@ -13,7 +13,9 @@ from werkzeug.utils import secure_filename
 
 from auth import current_user
 from database import get_connection
-from analysis import classify, detect_missing, find_similar
+from analysis import (
+    classify, detect_missing, find_potential_duplicates, find_similar,
+)
 
 complaints_bp = Blueprint("complaints", __name__)
 
@@ -46,15 +48,36 @@ MAX_EVIDENCE_SIZE = 5 * 1024 * 1024
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _row_to_dict(row) -> dict:
+def _row_to_dict(row, include_potential_duplicates=False) -> dict:
     d = dict(row)
-    for json_field in ("missing_fields", "similar_cases", "briefing"):
+    for json_field in (
+        "missing_fields", "similar_cases", "potential_duplicates", "briefing",
+    ):
         if d.get(json_field):
             try:
                 d[json_field] = json.loads(d[json_field])
             except (json.JSONDecodeError, TypeError):
                 pass
+    if not include_potential_duplicates:
+        d.pop("potential_duplicates", None)
     return d
+
+
+def _potential_duplicate_matches(conn, complaint):
+    candidates = conn.execute(
+        """SELECT complaint_id, title, description, location, item_details,
+                  reported_category, category, status, created_at
+           FROM complaints
+           WHERE complaint_id != ?
+           ORDER BY created_at DESC
+           LIMIT 1000""",
+        (complaint.get("complaint_id", ""),),
+    ).fetchall()
+    return find_potential_duplicates(
+        complaint,
+        candidates,
+        threshold=current_app.config["POTENTIAL_DUPLICATE_THRESHOLD"],
+    )
 
 
 def _build_briefing(complaint: dict, missing: list, similar: list) -> dict:
@@ -206,20 +229,22 @@ def submit_complaint():
     })
 
     with get_connection() as conn:
+        potential_duplicates = _potential_duplicate_matches(conn, complaint)
+        complaint["potential_duplicates"] = json.dumps(potential_duplicates)
         conn.execute("""
             INSERT INTO complaints (
                 complaint_id, title, description, location, incident_time,
                 item_details, escape_direction, preferred_language,
                 reporter_user_id, reporter_name, reporter_email,
                 status, category, reported_category, priority, category_reason, priority_reason,
-                missing_fields, similar_cases, briefing,
+                missing_fields, similar_cases, potential_duplicates, briefing,
                 created_at, updated_at
             ) VALUES (
                 :complaint_id, :title, :description, :location, :incident_time,
                 :item_details, :escape_direction, :preferred_language,
                 :reporter_user_id, :reporter_name, :reporter_email,
                 :status, :category, :reported_category, :priority, :category_reason, :priority_reason,
-                :missing_fields, :similar_cases, :briefing,
+                :missing_fields, :similar_cases, :potential_duplicates, :briefing,
                 :created_at, :updated_at
             )
         """, complaint)
@@ -289,6 +314,35 @@ def list_complaints():
     if search:
         clauses.append("(complaint_id LIKE ? OR title LIKE ? OR description LIKE ? OR location LIKE ?)")
         params.extend([f"%{search}%"] * 4)
+    priority = request.args.get("priority", "").strip()
+    if priority:
+        if priority not in {"High", "Medium", "Low"}:
+            return jsonify({"error": "priority must be High, Medium, or Low."}), 400
+        clauses.append("priority = ?")
+        params.append(priority)
+    assigned_officer = request.args.get("assigned_officer_id", "").strip()
+    if assigned_officer:
+        try:
+            officer_id = int(assigned_officer)
+        except ValueError:
+            return jsonify({"error": "assigned_officer_id must be an integer."}), 400
+        if officer_id < 1:
+            return jsonify({"error": "assigned_officer_id must be positive."}), 400
+        clauses.append("assigned_officer_id = ?")
+        params.append(officer_id)
+    for parameter, operator in (
+        ("created_after", ">="), ("created_before", "<="),
+    ):
+        value = request.args.get(parameter, "").strip()
+        if value:
+            try:
+                datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({
+                    "error": f"{parameter} must use YYYY-MM-DD format."
+                }), 400
+            clauses.append(f"date(created_at) {operator} date(?)")
+            params.append(value)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
     with get_connection() as conn:
@@ -304,7 +358,12 @@ def list_complaints():
         "total": total,
         "limit": limit,
         "offset": offset,
-        "complaints": [_row_to_dict(r) for r in rows]
+        "complaints": [
+            _row_to_dict(
+                row, include_potential_duplicates=identity["role"] in ("officer", "admin")
+            )
+            for row in rows
+        ]
     }), 200
 
 
@@ -323,7 +382,13 @@ def get_complaint(complaint_id):
         if row and not _can_access(row, identity):
             return jsonify({"error": "Complaint not found."}), 404
         if row:
-            result = _attach_related_data(conn, _row_to_dict(row))
+            result = _attach_related_data(
+                conn,
+                _row_to_dict(
+                    row,
+                    include_potential_duplicates=identity["role"] in ("officer", "admin"),
+                ),
+            )
 
     if not row:
         return jsonify({"error": f"Complaint '{complaint_id}' not found."}), 404
@@ -378,6 +443,7 @@ def edit_complaint(complaint_id):
         classification = classify(complaint)
         missing = detect_missing(complaint)
         similar = find_similar(complaint)
+        potential_duplicates = _potential_duplicate_matches(conn, complaint)
         now = _utc_now()
         briefing = _build_briefing(
             {**complaint, **classification}, missing, similar
@@ -389,6 +455,7 @@ def edit_complaint(complaint_id):
             "priority_reason": classification["priority_reason"],
             "missing_fields": json.dumps(missing),
             "similar_cases": json.dumps(similar),
+            "potential_duplicates": json.dumps(potential_duplicates),
             "briefing": json.dumps(briefing),
             "updated_at": now,
         })
@@ -432,6 +499,7 @@ def analyze_complaint(complaint_id):
 
     now = _utc_now()
     with get_connection() as conn:
+        potential_duplicates = _potential_duplicate_matches(conn, complaint)
         conn.execute("""
             UPDATE complaints
             SET category        = ?,
@@ -440,6 +508,7 @@ def analyze_complaint(complaint_id):
                 priority_reason = ?,
                 missing_fields  = ?,
                 similar_cases   = ?,
+                potential_duplicates = ?,
                 briefing        = ?,
                 updated_at      = ?
             WHERE complaint_id = ?
@@ -450,6 +519,7 @@ def analyze_complaint(complaint_id):
             classification["priority_reason"],
             json.dumps(missing),
             json.dumps(similar),
+            json.dumps(potential_duplicates),
             json.dumps(briefing),
             now,
             complaint_id,
@@ -469,6 +539,11 @@ def analyze_complaint(complaint_id):
         ),
         "briefing":       briefing,
         "disclaimer":     classification["disclaimer"],
+        **(
+            {"potential_duplicates": potential_duplicates}
+            if identity["role"] in ("officer", "admin")
+            else {}
+        ),
     }), 200
 
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Officer Dashboard | CRIMVEXA AI</title>
+  <title>Investigation Workspace | CRIMVEXA AI</title>
   <style>
     :root {
       --navy: #0b1120;
@@ -16,6 +16,7 @@
       --text: #172033;
       --soft: #64748b;
       --bg: #f8fafc;
+      --focus: #2563eb;
     }
     * { box-sizing: border-box; }
     body {
@@ -49,6 +50,11 @@
       flex-wrap: wrap;
       margin-bottom: 24px;
     }
+    .topbar p { margin: 5px 0 0; color: var(--soft); }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    #refreshStatus { color: var(--soft); font-size: 13px; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    button:disabled { cursor: wait; opacity: .7; }
     h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.8rem); }
     .stats {
       display: grid;
@@ -146,6 +152,14 @@
       .stats { grid-template-columns: repeat(2, 1fr); }
       .layout { grid-template-columns: 1fr; }
     }
+    @media (max-width: 560px) {
+      .container { margin-top: 18px; padding-inline: 14px; }
+      .stat { padding: 14px; }
+      .stat .value { font-size: 1.6rem; }
+      .panel { padding: 16px; }
+      .topbar-actions { width: 100%; }
+      .topbar-actions .btn { flex: 1; }
+    }
   </style>
 </head>
 <body>
@@ -161,8 +175,15 @@
 
   <main class="container">
     <div class="topbar">
-      <h1>Officer dashboard</h1>
-      <button type="button" class="btn btn-outline" id="signOut">Sign out</button>
+      <div>
+        <h1>Investigation workspace</h1>
+        <p id="signedInAs"></p>
+      </div>
+      <div class="topbar-actions">
+        <span id="refreshStatus" role="status" aria-live="polite">Loading cases…</span>
+        <button type="button" class="btn btn-outline" id="refreshCases">Refresh cases</button>
+        <button type="button" class="btn btn-outline" id="signOut">Sign out</button>
+      </div>
     </div>
 
     <section class="stats">
@@ -201,36 +222,64 @@
       const detailPanel = document.getElementById("detailPanel");
       let cases = [];
       let selected = null;
+      let selectedUpdatedAt = null;
+      let detailRequest = 0;
+      let loading = false;
       const staff = await CrimvexaAPI.requireUser("officer");
       if (!staff) return;
+      document.getElementById("signedInAs").textContent =
+        `${staff.full_name} · ${staff.role === "admin" ? "Administrator" : "Investigation staff"}`;
       document.getElementById("signOut").addEventListener("click", CrimvexaAPI.logout);
 
       async function load() {
+        if (loading) return;
+        loading = true;
+        try {
+          await refreshCases();
+        } finally {
+          loading = false;
+        }
+      }
+
+      async function refreshCases() {
+        const refreshStatus = document.getElementById("refreshStatus");
+        refreshStatus.textContent = "Refreshing…";
         const stats = await CrimvexaAPI.request("/dashboard/stats");
         document.getElementById("countNew").textContent = stats.by_status.New || 0;
         document.getElementById("countReview").textContent = stats.by_status["Under Review"] || 0;
         document.getElementById("countResolved").textContent = stats.by_status.Resolved || 0;
-        const result = await CrimvexaAPI.request("/complaints?limit=100");
+        const query = filter.value === "ALL"
+          ? ""
+          : `&status=${encodeURIComponent(filter.value)}`;
+        const result = await CrimvexaAPI.request(`/complaints?limit=100${query}`);
         cases = result.complaints;
         document.getElementById("countInfo").textContent =
           cases.filter(item => item.missing_fields && item.missing_fields.length).length;
         renderList();
-        if (selected) {
-          const updated = cases.find(item => item.complaint_id === selected);
-          if (updated) renderDetail(updated);
+        const updated = cases.find(item => item.complaint_id === selected);
+        if (updated) {
+          if (updated.updated_at !== selectedUpdatedAt) await renderDetail(updated);
         } else if (cases.length) {
           selected = cases[0].complaint_id;
-          renderDetail(cases[0]);
+          selectedUpdatedAt = null;
+          await renderDetail(cases[0]);
         } else {
+          selected = null;
+          selectedUpdatedAt = null;
           detailPanel.textContent = "No complaints have been submitted.";
         }
+        refreshStatus.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+      }
+
+      function showLoadError(error) {
+        document.getElementById("refreshStatus").textContent = "Refresh failed";
+        caseList.textContent = error.message;
       }
 
       function renderList() {
         caseList.replaceChildren();
-        const filtered = cases.filter(item => filter.value === "ALL" || item.status === filter.value);
-        if (!filtered.length) { caseList.textContent = "No cases match the selected filter."; return; }
-        filtered.forEach(item => {
+        if (!cases.length) { caseList.textContent = "No cases match the selected filter."; return; }
+        cases.forEach(item => {
           const card = document.createElement("button");
           card.type = "button";
           card.className = `case-card${selected === item.complaint_id ? " active" : ""}`;
@@ -240,14 +289,26 @@
           meta.className = "meta";
           meta.textContent = `${item.reported_category || item.category} · ${item.status} · ${CrimvexaAPI.formatDate(item.created_at)} · ${item.location || "Location not supplied"}`;
           card.append(title, meta);
-          card.addEventListener("click", () => { selected = item.complaint_id; renderList(); renderDetail(item); });
+          card.addEventListener("click", () => {
+            selected = item.complaint_id;
+            selectedUpdatedAt = null;
+            renderList();
+            renderDetail(item).catch(error => {
+              detailPanel.textContent = error.message;
+            });
+          });
           caseList.append(card);
         });
       }
 
-      async function renderDetail(item) {
+      async function renderDetail(item, force = false) {
+        const requestId = ++detailRequest;
+        const complaintId = item.complaint_id;
         item = await CrimvexaAPI.request(`/complaints/${encodeURIComponent(item.complaint_id)}`);
+        if (requestId !== detailRequest || selected !== complaintId) return;
+        if (!force && selectedUpdatedAt === item.updated_at) return;
         detailPanel.replaceChildren();
+        selectedUpdatedAt = item.updated_at;
         const heading = document.createElement("h2");
         heading.textContent = item.title || item.complaint_id;
         const text = document.createElement("p");
@@ -259,10 +320,38 @@
         category.textContent = `Suggested category: ${item.category || "Unclassified"} — ${item.category_reason || "No reasoning available"}`;
         const evidence = document.createElement("p");
         evidence.textContent = `Evidence attached: ${(item.evidence || []).length}`;
+        const matchesSection = document.createElement("section");
+        const matchesHeading = document.createElement("h3");
+        matchesHeading.textContent = "Possible related cases";
+        matchesSection.append(matchesHeading);
+        const matchesList = document.createElement("ul");
+        let matches = item.potential_duplicates;
+        if (typeof matches === "string") matches = JSON.parse(matches);
+        if (matches == null) matches = [];
+        if (!Array.isArray(matches)) {
+          throw new Error("The server returned invalid potential-match data.");
+        }
+        if (matches.length) {
+          matches.forEach(match => {
+            const row = document.createElement("li");
+            row.textContent =
+              `${match.case_id} · ${match.category || "Unclassified"} · ` +
+              `${Math.round(match.similarity * 100)}% text similarity — ${match.summary}`;
+            matchesList.append(row);
+          });
+        } else {
+          const row = document.createElement("li");
+          row.textContent = "No potential matches above the review threshold.";
+          matchesList.append(row);
+        }
+        const matchNote = document.createElement("p");
+        matchNote.textContent = "Similarity is a review aid only; it does not merge or reject cases.";
+        matchesSection.append(matchesList, matchNote);
         const assignment = document.createElement("p");
         const currentAssignment = await CrimvexaAPI.request(
           `/complaints/${encodeURIComponent(item.complaint_id)}/assignment`
         );
+        if (requestId !== detailRequest || selected !== complaintId) return;
         assignment.textContent = currentAssignment.assigned_officer
           ? `Assigned to: ${currentAssignment.assigned_officer.full_name}`
           : "Unassigned";
@@ -290,6 +379,7 @@
         const notes = await CrimvexaAPI.request(
           `/complaints/${encodeURIComponent(item.complaint_id)}/notes`
         );
+        if (requestId !== detailRequest || selected !== complaintId) return;
         notes.notes.forEach(entry => {
           const row = document.createElement("li");
           row.textContent = `${entry.officer_name} · ${CrimvexaAPI.formatDate(entry.created_at)}: ${entry.note}`;
@@ -301,7 +391,7 @@
             await CrimvexaAPI.request(`/complaints/${encodeURIComponent(item.complaint_id)}/notes`, {
               method: "POST", body: { note: noteInput.value }
             });
-            await renderDetail(item);
+            await renderDetail(item, true);
           } catch (error) {
             noteStatus.textContent = error.message;
             saveNote.disabled = false;
@@ -333,14 +423,27 @@
           actions.append(button);
         });
         detailPanel.append(
-          heading, text, location, category, evidence, assignment, assignButton,
+          heading, text, location, category, evidence, matchesSection,
+          assignment, assignButton,
           noteLabel, saveNote, noteStatus, notesList, actions
         );
       }
 
-      filter.addEventListener("change", renderList);
+      filter.addEventListener("change", () => {
+        selected = null;
+        load().catch(showLoadError);
+      });
+      document.getElementById("refreshCases").addEventListener("click", () => {
+        load().catch(showLoadError);
+      });
+      window.setInterval(() => {
+        if (document.visibilityState === "visible") {
+          load().catch(showLoadError);
+        }
+      }, 15000);
       await load();
     })().catch(error => {
+      document.getElementById("refreshStatus").textContent = "Unable to load workspace";
       document.getElementById("caseList").textContent = error.message;
     });
   </script>

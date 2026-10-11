@@ -4,6 +4,7 @@ Run with: python test_backend.py
 """
 
 import json
+import hashlib
 import os
 import tempfile
 import unittest
@@ -11,6 +12,9 @@ from io import BytesIO
 
 import app as app_module
 from database import get_connection
+from analysis import (
+    classify, detect_missing, find_potential_duplicates, find_similar,
+)
 
 
 class CrimvexaTests(unittest.TestCase):
@@ -85,6 +89,15 @@ class CrimvexaTests(unittest.TestCase):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["status"], "ok")
+
+    def test_similarity_threshold_configuration_is_validated(self):
+        for invalid_threshold in ("not-a-number", "nan", "inf", "-0.1", "1.1"):
+            with self.subTest(threshold=invalid_threshold):
+                with self.assertRaises(ValueError):
+                    app_module.create_app({
+                        "TESTING": True,
+                        "POTENTIAL_DUPLICATE_THRESHOLD": invalid_threshold,
+                    })
 
     def test_oversized_requests_return_json_error(self):
         previous_limit = self.flask_app.config["MAX_CONTENT_LENGTH"]
@@ -190,6 +203,177 @@ class CrimvexaTests(unittest.TestCase):
             headers=self.citizen_headers,
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_classification_boundaries_category_overlap_and_priority_negation(self):
+        cyber = classify({
+            "description": (
+                "My online bank account was hacked and money was transferred "
+                "after a scam."
+            )
+        })
+        self.assertEqual(cyber["category"], "Online / Cyber Fraud")
+        self.assertEqual(cyber["priority"], "Medium")
+
+        lost = classify({
+            "description": "I was not attacked and did not see a weapon, but my bag is missing."
+        })
+        self.assertEqual(lost["category"], "Lost Property")
+        self.assertEqual(lost["priority"], "Medium")
+
+        low = classify({"description": "I lost a small wallet yesterday."})
+        self.assertEqual(low["priority"], "Low")
+
+        boundary = classify({
+            "description": "A minority group reported a small administrative issue."
+        })
+        self.assertEqual(boundary["category"], "Other / Unclassified")
+        self.assertEqual(boundary["priority"], "Low")
+
+        with self.assertRaises(ValueError):
+            classify(None)
+        self.assertTrue(detect_missing({
+            "description": ["wrong type"],
+            "location": 42,
+            "incident_time": None,
+        }))
+
+    def test_similarity_algorithms_validate_inputs_and_find_expected_matches(self):
+        complaint = {
+            "complaint_id": "CW-NEW",
+            "title": "Phone theft",
+            "description": "My mobile phone was snatched near the bus stand by someone on a motorcycle.",
+        }
+        candidate = {
+            "complaint_id": "CW-OLD",
+            "title": "Phone theft",
+            "description": "My mobile phone was snatched near the bus stand by someone on a motorcycle.",
+            "category": "Theft",
+            "status": "New",
+            "created_at": "2026-01-01",
+        }
+        unrelated = {
+            "complaint_id": "CW-OTHER",
+            "description": "A fake online bank OTP call transferred money to a scammer.",
+        }
+        matches = find_potential_duplicates(complaint, [candidate, unrelated])
+        self.assertEqual([item["case_id"] for item in matches], ["CW-OLD"])
+        self.assertGreaterEqual(matches[0]["similarity"], 0.35)
+        self.assertEqual(find_potential_duplicates(complaint, []), [])
+        self.assertEqual(
+            find_potential_duplicates(complaint, [unrelated], threshold=0),
+            [],
+        )
+        self.assertTrue(find_similar(complaint))
+        self.assertEqual(find_similar({"description": "unrelated text"}), [])
+        with self.assertRaises(ValueError):
+            find_potential_duplicates(complaint, [candidate], threshold=1.1)
+        with self.assertRaises(ValueError):
+            find_similar(complaint, top_n=0)
+
+    def test_potential_duplicate_matches_are_staff_only_and_persisted(self):
+        first = self.submit({
+            "title": "Phone theft",
+            "description": (
+                "My mobile phone was snatched near the bus stand "
+                "by someone on a motorcycle."
+            ),
+        }).json
+        second = self.submit({
+            "title": "Phone theft",
+            "description": (
+                "My mobile phone was snatched near the bus stand "
+                "by someone riding a motorcycle."
+            ),
+        }).json
+        self.assertEqual(second["similar_cases"][0]["case_id"], "SYN-001")
+
+        citizen_case = self.client.get(
+            f"/api/complaints/{second['complaint_id']}",
+            headers=self.citizen_headers,
+        )
+        self.assertEqual(citizen_case.status_code, 200)
+        self.assertNotIn("potential_duplicates", citizen_case.json)
+
+        staff_case = self.client.get(
+            f"/api/complaints/{second['complaint_id']}",
+            headers=self.officer_headers,
+        )
+        self.assertEqual(staff_case.status_code, 200)
+        self.assertEqual(
+            staff_case.json["potential_duplicates"][0]["case_id"],
+            first["complaint_id"],
+        )
+        self.assertGreater(
+            staff_case.json["potential_duplicates"][0]["similarity"], 0.35
+        )
+        reanalyzed = self.client.post(
+            f"/api/complaints/{second['complaint_id']}/analyze",
+            headers=self.officer_headers,
+        )
+        self.assertEqual(reanalyzed.status_code, 200)
+        self.assertEqual(
+            reanalyzed.json["potential_duplicates"][0]["case_id"],
+            first["complaint_id"],
+        )
+        old_threshold = self.flask_app.config["POTENTIAL_DUPLICATE_THRESHOLD"]
+        try:
+            self.flask_app.config["POTENTIAL_DUPLICATE_THRESHOLD"] = 1.0
+            filtered = self.client.post(
+                f"/api/complaints/{second['complaint_id']}/analyze",
+                headers=self.officer_headers,
+            )
+            self.assertEqual(filtered.status_code, 200)
+            self.assertEqual(filtered.json["potential_duplicates"], [])
+        finally:
+            self.flask_app.config["POTENTIAL_DUPLICATE_THRESHOLD"] = old_threshold
+
+        listed = self.client.get(
+            "/api/complaints", headers=self.officer_headers
+        ).json["complaints"]
+        self.assertTrue(all("potential_duplicates" in item for item in listed))
+
+    def test_complaint_filters_combine_and_reject_invalid_values(self):
+        theft = self.submit({
+            "description": "A phone was stolen near the train station."
+        }).json
+        self.submit({
+            "description": "A fake bank OTP call transferred money."
+        })
+        self.client.put(
+            f"/api/complaints/{theft['complaint_id']}/assignment",
+            json={},
+            headers=self.officer_headers,
+        )
+        response = self.client.get(
+            "/api/complaints?status=New&category=Theft&priority=Medium"
+            "&created_after=2000-01-01",
+            headers=self.officer_headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json["total"], 1)
+        self.assertEqual(
+            response.json["complaints"][0]["complaint_id"],
+            theft["complaint_id"],
+        )
+
+        invalid = self.client.get(
+            "/api/complaints?priority=Urgent", headers=self.officer_headers
+        )
+        self.assertEqual(invalid.status_code, 400)
+        invalid_date = self.client.get(
+            "/api/complaints?created_after=yesterday",
+            headers=self.officer_headers,
+        )
+        self.assertEqual(invalid_date.status_code, 400)
+        officer_id = self.flask_app.test_client().get(
+            "/api/auth/me", headers=self.officer_headers
+        ).json["user"]["user_id"]
+        assigned = self.client.get(
+            f"/api/complaints?assigned_officer_id={officer_id}",
+            headers=self.officer_headers,
+        )
+        self.assertEqual(assigned.status_code, 200)
+        self.assertEqual(assigned.json["total"], 1)
 
     def test_status_update_and_persistence(self):
         complaint_id = self.submit().json["complaint_id"]
@@ -334,9 +518,10 @@ class CrimvexaTests(unittest.TestCase):
 
     def test_evidence_upload_and_download(self):
         complaint_id = self.submit().json["complaint_id"]
+        content = b"%PDF-1.4\nvalid test document"
         upload = self.client.post(
             f"/api/complaints/{complaint_id}/evidence",
-            data={"files": (BytesIO(b"%PDF-1.4\nvalid test document"), "evidence.pdf")},
+            data={"files": (BytesIO(content), "evidence.pdf")},
             content_type="multipart/form-data",
             headers=self.citizen_headers,
         )
@@ -348,6 +533,10 @@ class CrimvexaTests(unittest.TestCase):
         )
         self.assertEqual(listing.status_code, 200)
         self.assertEqual(listing.json["evidence"][0]["file_size"], 28)
+        self.assertEqual(
+            listing.json["evidence"][0]["sha256"],
+            hashlib.sha256(content).hexdigest(),
+        )
         download = self.client.get(
             f"/api/evidence/{evidence_id}/file",
             headers=self.citizen_headers,
@@ -355,6 +544,24 @@ class CrimvexaTests(unittest.TestCase):
         self.assertEqual(download.status_code, 200)
         self.assertTrue(download.data.startswith(b"%PDF-"))
         download.close()
+
+    def test_evidence_rejects_invalid_signature_and_unsupported_format(self):
+        complaint_id = self.submit().json["complaint_id"]
+        bad_pdf = self.client.post(
+            f"/api/complaints/{complaint_id}/evidence",
+            data={"files": (BytesIO(b"not a PDF"), "evidence.pdf")},
+            content_type="multipart/form-data",
+            headers=self.citizen_headers,
+        )
+        self.assertEqual(bad_pdf.status_code, 400)
+
+        unsupported = self.client.post(
+            f"/api/complaints/{complaint_id}/evidence",
+            data={"files": (BytesIO(b"binary"), "evidence.exe")},
+            content_type="multipart/form-data",
+            headers=self.citizen_headers,
+        )
+        self.assertEqual(unsupported.status_code, 400)
 
     def test_dashboard_stats_are_database_backed(self):
         self.submit()

@@ -3,7 +3,17 @@ CRIMVEXA WITNESS — Baseline Text Analysis
 Rule-based category/priority suggestions and missing-field detection.
 """
 
+import math
 import re
+
+POTENTIAL_DUPLICATE_THRESHOLD = 0.35
+_TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
+_STOP_WORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "been", "by", "for",
+    "from", "had", "has", "have", "i", "in", "is", "it", "me", "my",
+    "of", "on", "or", "our", "the", "this", "to", "was", "we", "were",
+    "with", "case", "complaint", "crime", "incident", "report", "reported",
+}
 
 # ── Category keyword rules ────────────────────────────────────────────────────
 CATEGORY_RULES = [
@@ -44,16 +54,44 @@ LOW_PRIORITY_KEYWORDS = [
 
 
 def _text(complaint: dict) -> str:
-    """Combine all text fields into one lowercase string for matching."""
+    """Combine supported text fields, ignoring missing or non-string values."""
+    if not isinstance(complaint, dict):
+        raise ValueError("complaint must be a dictionary")
     parts = [
-        complaint.get("title") or "",
-        complaint.get("description") or "",
-        complaint.get("location") or "",
-        complaint.get("item_details") or "",
-        complaint.get("escape_direction") or "",
-        complaint.get("reported_category") or "",
+        complaint.get(field)
+        for field in (
+            "title", "description", "location", "item_details",
+            "escape_direction", "reported_category",
+        )
     ]
-    return " ".join(parts).lower()
+    return " ".join(value for value in parts if isinstance(value, str)).casefold()
+
+
+def _field_text(complaint: dict, field: str) -> str:
+    value = complaint.get(field)
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _matching_keywords(
+    text: str, keywords: list[str], ignore_negated: bool = False,
+) -> list[str]:
+    """Match whole words or phrases, not accidental substrings."""
+    matches = []
+    for keyword in keywords:
+        escaped_keyword = re.escape(keyword).replace("\\ ", "\\s+")
+        pattern = rf"(?<!\w){escaped_keyword}(?!\w)"
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            if ignore_negated:
+                context = text[max(0, match.start() - 40):match.start()]
+                if re.search(
+                    r"\b(?:no|not|never|without|isn't|aren't|wasn't|"
+                    r"weren't|didn't|doesn't|don't)\b(?:\W+\w+){0,3}\W*$",
+                    context,
+                ):
+                    continue
+            matches.append(keyword)
+    return matches
 
 
 def classify(complaint: dict) -> dict:
@@ -64,22 +102,22 @@ def classify(complaint: dict) -> dict:
     text = _text(complaint)
 
     # ── Category ─────────────────────────────────────────────────────────────
-    matched_category = None
-    category_reason = None
+    category_matches = []
     for rule in CATEGORY_RULES:
-        hits = [kw for kw in rule["keywords"] if kw in text]
+        hits = _matching_keywords(text, rule["keywords"], ignore_negated=True)
         if hits:
-            matched_category = rule["category"]
-            category_reason = f"Keywords detected: {', '.join(hits[:3])}"
-            break
+            category_matches.append((len(hits), rule["category"], hits))
 
-    if not matched_category:
+    if category_matches:
+        _, matched_category, hits = max(category_matches, key=lambda item: item[0])
+        category_reason = f"Keywords detected: {', '.join(hits[:3])}"
+    else:
         matched_category = "Other / Unclassified"
         category_reason = "No strong keyword match found. Manual review needed."
 
     # ── Priority ──────────────────────────────────────────────────────────────
-    high_hits = [kw for kw in HIGH_PRIORITY_KEYWORDS if kw in text]
-    low_hits  = [kw for kw in LOW_PRIORITY_KEYWORDS  if kw in text]
+    high_hits = _matching_keywords(text, HIGH_PRIORITY_KEYWORDS, ignore_negated=True)
+    low_hits = _matching_keywords(text, LOW_PRIORITY_KEYWORDS, ignore_negated=True)
 
     if high_hits:
         priority = "High"
@@ -114,38 +152,44 @@ def detect_missing(complaint: dict) -> list:
     text   = _text(complaint)
     issues = []
 
-    desc = (complaint.get("description") or "").strip()
+    desc = _field_text(complaint, "description")
     if len(desc) < 20:
         issues.append({
             "field": "description",
             "question": "Can you describe what happened in more detail?"
         })
 
-    if not (complaint.get("location") or "").strip():
+    if not _field_text(complaint, "location"):
         issues.append({
             "field": "location",
             "question": "Where did the incident take place? (e.g. street name, landmark, city)"
         })
 
-    if not (complaint.get("incident_time") or "").strip():
+    if not _field_text(complaint, "incident_time"):
         issues.append({
             "field": "incident_time",
             "question": "When did this happen? (date and approximate time)"
         })
 
     # Only ask about items if the complaint seems property-related
-    property_keywords = ["stolen", "theft", "lost", "missing", "robbery", "snatch", "fraud", "scam"]
-    if any(kw in text for kw in property_keywords):
-        if not (complaint.get("item_details") or "").strip():
+    property_keywords = [
+        "stolen", "theft", "lost", "missing", "robbery", "snatch",
+        "fraud", "scam",
+    ]
+    if _matching_keywords(text, property_keywords):
+        if not _field_text(complaint, "item_details"):
             issues.append({
                 "field": "item_details",
                 "question": "Can you describe the item(s) involved? (e.g. type, colour, estimated value)"
             })
 
     # Only ask about suspect/escape if it seems like a physical crime
-    physical_keywords = ["stolen", "robbery", "robbed", "snatch", "assault", "attack", "threat"]
-    if any(kw in text for kw in physical_keywords):
-        if not (complaint.get("escape_direction") or "").strip():
+    physical_keywords = [
+        "stolen", "robbery", "robbed", "snatch", "assault", "attack",
+        "threat",
+    ]
+    if _matching_keywords(text, physical_keywords):
+        if not _field_text(complaint, "escape_direction"):
             issues.append({
                 "field": "escape_direction",
                 "question": "Did you notice which direction the suspect went, or any suspect description?"
@@ -206,19 +250,20 @@ def find_similar(complaint: dict, top_n: int = 3) -> list:
     Compare a complaint to synthetic sample cases using keyword overlap.
     Returns up to top_n matches. Returns empty list if no overlap found.
     """
+    if not isinstance(top_n, int) or isinstance(top_n, bool) or top_n < 1:
+        raise ValueError("top_n must be a positive integer")
     text = _text(complaint)
-    words = set(re.findall(r"\w+", text))
 
     scored = []
     for case in SYNTHETIC_CASES:
-        hits = [kw for kw in case["keywords"] if kw in text or kw in words]
+        hits = _matching_keywords(text, case["keywords"])
         if hits:
             scored.append({
                 "case_id":      case["case_id"],
                 "category":     case["category"],
                 "summary":      case["summary"],
                 "match_reason": f"Shared keywords: {', '.join(hits)}",
-                "match_score":  len(hits),
+                "match_score":  len(hits) / len(case["keywords"]),
             })
 
     scored.sort(key=lambda x: x["match_score"], reverse=True)
@@ -228,3 +273,85 @@ def find_similar(complaint: dict, top_n: int = 3) -> list:
         return []   # Caller adds "no match" message
 
     return result
+
+
+def find_potential_duplicates(
+    complaint: dict,
+    candidates,
+    top_n: int = 3,
+    threshold: float = POTENTIAL_DUPLICATE_THRESHOLD,
+) -> list:
+    """Return staff-only lexical TF-IDF/cosine candidates above the threshold."""
+    if not isinstance(complaint, dict):
+        raise ValueError("complaint must be a dictionary")
+    if not isinstance(top_n, int) or isinstance(top_n, bool) or top_n < 1:
+        raise ValueError("top_n must be a positive integer")
+    if not isinstance(threshold, (int, float)) or not 0 <= threshold <= 1:
+        raise ValueError("threshold must be between 0 and 1")
+    if candidates is None:
+        raise ValueError("candidates must be iterable")
+
+    query_id = complaint.get("complaint_id")
+    documents = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            candidate = dict(candidate)
+        if candidate.get("complaint_id") == query_id:
+            continue
+        documents.append(candidate)
+
+    def terms(record):
+        text = _text(record)
+        return [
+            token for token in _TOKEN_PATTERN.findall(text)
+            if len(token) > 1 and token not in _STOP_WORDS
+        ]
+
+    query_terms = terms(complaint)
+    if not query_terms:
+        return []
+
+    candidate_terms = [terms(candidate) for candidate in documents]
+    corpus_size = len(candidate_terms) + 1
+    document_frequency = {}
+    for document in [query_terms, *candidate_terms]:
+        for term in set(document):
+            document_frequency[term] = document_frequency.get(term, 0) + 1
+
+    def vectorize(tokens):
+        counts = {}
+        for token in tokens:
+            counts[token] = counts.get(token, 0) + 1
+        vector = {
+            token: (1 + math.log(count)) *
+            (math.log((corpus_size + 1) / (document_frequency[token] + 1)) + 1)
+            for token, count in counts.items()
+        }
+        norm = math.sqrt(sum(weight * weight for weight in vector.values()))
+        return ({token: weight / norm for token, weight in vector.items()}
+                if norm else {})
+
+    query_vector = vectorize(query_terms)
+    if not query_vector:
+        return []
+
+    scored = []
+    for candidate, tokens in zip(documents, candidate_terms):
+        candidate_vector = vectorize(tokens)
+        score = sum(
+            weight * candidate_vector.get(token, 0)
+            for token, weight in query_vector.items()
+        )
+        if score > 0 and score >= threshold:
+            description = candidate.get("description")
+            scored.append({
+                "case_id": candidate.get("complaint_id"),
+                "category": candidate.get("category"),
+                "status": candidate.get("status"),
+                "created_at": candidate.get("created_at"),
+                "summary": description[:200] if isinstance(description, str) else "",
+                "similarity": round(min(score, 1.0), 4),
+            })
+
+    scored.sort(key=lambda match: (-match["similarity"], match["case_id"] or ""))
+    return scored[:top_n]
