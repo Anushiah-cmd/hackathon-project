@@ -1,0 +1,10 @@
+{
+  "name": "Remix CRIMVEXA AI — Smart Crime Reporting \u0026 Digital Evidence Analysis",
+  "description": "Voice-first, multi-agent crime reporting, digital evidence analysis with SHA-256 hashing, automated case linking, and officer triage dashboards.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
