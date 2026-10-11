@@ -1,0 +1,71 @@
+CRIMVEXA AI — PROJECT OVERVIEW
+================================
+
+PROJECT
+-------
+CRIMVEXA AI is a multilingual crime-reporting and case-management hackathon
+project built for the Techashy 2.0 Security Track. It helps citizens prepare
+structured incident narratives and gives investigation staff tools to review,
+triage, and track reports.
+
+PROBLEM
+-------
+People reporting a crime may be under stress, unsure what details to include,
+or more comfortable speaking in a regional language. Investigation teams also
+need reports in a consistent format with clear status and review workflows.
+
+SOLUTION
+--------
+The project provides incident intake, evidence handling, transparent
+rule-based triage, case tracking, and staff review tools. One implementation
+uses a Flask API with SQLite persistence. A second, separate React/Express
+demonstration showcases richer voice, forensic, and agent-oriented screens.
+These implementations have different APIs and data stores.
+
+KEY CAPABILITIES
+----------------
+- Citizen registration/sign-in and structured complaint submission.
+- Incident narrative intake in English and supported regional languages.
+- Evidence upload with size/type validation and SHA-256 metadata in the
+  applicable implementation.
+- Explainable category, priority, and missing-detail suggestions.
+- Case status history and investigation staff workflows.
+- React/Express demo: voice transcription endpoint, case triage dashboard,
+  forensic lab presentation, MCP-style tools, and mock portal demonstration.
+- Test suites for API workflows, validation, and audio transcription behavior.
+
+TECHNOLOGY
+----------
+Flask implementation:
+  Python, Flask REST API, SQLite, static HTML/CSS/JavaScript.
+
+React/Express implementation:
+  React, TypeScript, Vite, Tailwind CSS, Express, Node.js.
+  Optional audio transcription uses the OpenAI Audio Transcriptions API.
+
+REPOSITORY LAYOUT
+-----------------
+backend/                      Flask API, SQLite access, analysis, and tests
+docs/                         API contract and technical documentation
+frontend/crimvexa-demo/       Static frontend for the Flask implementation
+frontend/react-express-app/   Standalone React and Express implementation
+README.md                     Setup, architecture, and judge walkthrough
+PROJECT_OVERVIEW.txt          This plain-text project summary
+
+RUNNING
+-------
+For the Flask version, install backend/requirements.txt, run backend/app.py,
+and serve frontend/crimvexa-demo on port 8000. See README.md for commands.
+
+For the React/Express version, open frontend/react-express-app, run npm install,
+optionally configure OPENAI_API_KEY in a private .env file, and run npm run dev.
+
+SCOPE AND SAFETY
+----------------
+This is a local/hackathon demonstration. It is not an emergency service, does
+not submit reports to a police authority, and does not replace official
+reporting channels. Automated analysis is a review aid, not a decision.
+Use synthetic information only. Call 112 in India in an emergency.
+
+For implementation-specific setup and limitations, refer to README.md and
+frontend/react-express-app/README.md.
